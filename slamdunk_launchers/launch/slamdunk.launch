@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<launch>
+  <node name="slamdunk" pkg="slamdunk_node" type="slamdunk_node" output="screen"/>
+</launch>

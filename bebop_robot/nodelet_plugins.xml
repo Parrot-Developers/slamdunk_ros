@@ -1,0 +1,7 @@
+<library path="lib/libbebop_nodelet">
+  <class name="bebop_robot/BebopNodelet" type="bebop_robot::BebopNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Control bebop robot
+    </description>
+  </class>
+</library>

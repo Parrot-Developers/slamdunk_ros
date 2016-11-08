@@ -1,0 +1,7 @@
+# Request a save
+
+# Target path
+string path
+# Override allowed ?
+bool allowOverride
+---

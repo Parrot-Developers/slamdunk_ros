@@ -1,0 +1,13 @@
+<robot name="robot_name">
+    <link name="cam0">
+        <visual name="all">
+            <origin xyz="0 0 0" rpy="3.14 0 -1.57" />
+            <geometry>
+                <mesh filename="package://slamdunk_visualization/models/slamdunk.stl" />
+            </geometry>
+            <material name="material_black">
+                <color rgba="0.1 0.1 0.1 1.0"/>
+            </material>
+        </visual>
+    </link>
+</robot>

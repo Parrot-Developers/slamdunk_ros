@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="rostopic" type="rostopic" name="$(anon topic_init)" args="pub /BebopNodelet/init std_msgs/Empty" output="screen"/>
+
+  <node pkg="rostopic" type="rostopic" name="$(anon topic_max_rotation_speed)" args="pub /BebopNodelet/setMaxRotationSpeed std_msgs/Float32 10.0" output="screen"/>
+  <node pkg="rostopic" type="rostopic" name="$(anon topic_max_tilt)" args="pub /BebopNodelet/setMaxTilt std_msgs/Float32 5.0" output="screen"/>
+  <node pkg="rostopic" type="rostopic" name="$(anon topic_max_vertical_speed)" args="pub /BebopNodelet/setMaxVerticalSpeed std_msgs/Float32 0.5" output="screen"/>
+</launch>

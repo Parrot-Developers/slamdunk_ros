@@ -1,0 +1,7 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="$(find slamdunk_launchers)/launch/slamdunk_interdrone_pcl_demo.launch" />
+  <include file="$(find slamdunk_launchers)/launch/bebop_nodelet.launch" />
+  <include file="$(find slamdunk_launchers)/launch/joystick.launch" />
+  <include file="$(find slamdunk_launchers)/launch/bebop_config.launch" />
+</launch>

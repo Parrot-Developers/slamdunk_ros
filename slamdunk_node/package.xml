@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<package>
+  <name>slamdunk_node</name>
+  <version>0.0.0</version>
+  <description>SLAMDunk main node</description>
+
+  <maintainer email="slamdunk@parrot.com">S.L.A.M.dunk</maintainer>
+  <license>BSD</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <build_depend>cv_bridge</build_depend>
+  <build_depend>depth_image_proc</build_depend>
+  <build_depend>image_geometry</build_depend>
+  <build_depend>image_transport</build_depend>
+  <build_depend>nodelet</build_depend>
+  <build_depend>octomap</build_depend>
+  <build_depend>octomap_msgs</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>slamdunk_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+
+  <run_depend>cv_bridge</run_depend>
+  <run_depend>depth_image_proc</run_depend>
+  <run_depend>image_geometry</run_depend>
+  <run_depend>image_transport</run_depend>
+  <run_depend>nodelet</run_depend>
+  <run_depend>octomap</run_depend>
+  <run_depend>octomap_msgs</run_depend>
+  <run_depend>roscpp</run_depend>
+  <run_depend>sensor_msgs</run_depend>
+  <run_depend>slamdunk_msgs</run_depend>
+  <run_depend>slamdunk_nodelets</run_depend>
+  <run_depend>std_msgs</run_depend>
+
+</package>

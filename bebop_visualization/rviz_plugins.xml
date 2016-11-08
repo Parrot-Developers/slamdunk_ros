@@ -1,0 +1,9 @@
+<library path="lib/libarsdk_panel">
+  <class name="bebop_visualization/ARSDKPanel"
+         type="bebop_visualization::ARSDKPanel"
+         base_class_type="rviz::Panel">
+    <description>
+      A panel widget diving information about ARSDK Parrot drone.
+    </description>
+  </class>
+</library>

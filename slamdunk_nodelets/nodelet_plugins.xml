@@ -1,0 +1,35 @@
+<library path="lib/libpcl_xyzrgb_concat_nodelet">
+  <class name="slamdunk_nodelets/PclXYZRGBConcatNodelet" type="slamdunk_nodelets::PclXYZRGBConcatNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Merge consecutive XYZRGB PointClouds into one single PointCloud
+    </description>
+  </class>
+</library>
+<library path="lib/libpcl_xyzrgb_record_nodelet">
+  <class name="slamdunk_nodelets/PclXYZRGBRecordNodelet" type="slamdunk_nodelets::PclXYZRGBRecordNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Save a pcl sequence in a given folder
+    </description>
+  </class>
+</library>
+<library path="lib/libkeyframe_publisher_nodelet">
+  <class name="slamdunk_nodelets/KeyframePublisherNodelet" type="slamdunk_nodelets::KeyframePublisherNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Republish frames that are tagged as KeyFrame
+    </description>
+  </class>
+</library>
+<library path="lib/libgoodframe_publisher_nodelet">
+  <class name="slamdunk_nodelets/GoodframePublisherNodelet" type="slamdunk_nodelets::GoodframePublisherNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Republish frames that are associated with a good slam quality indicator
+    </description>
+  </class>
+</library>
+<library path="lib/libpose_to_path_nodelet">
+  <class name="slamdunk_nodelets/PoseToPathNodelet" type="slamdunk_nodelets::PoseToPathNodelet" base_class_type="nodelet::Nodelet">
+    <description>
+      Concatenate poses into a path
+    </description>
+  </class>
+</library>

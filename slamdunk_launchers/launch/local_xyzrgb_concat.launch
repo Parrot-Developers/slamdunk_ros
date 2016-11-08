@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="nodelet" type="nodelet" name="pcl_nodelet_manager" args="manager"/>
+
+  <node pkg="nodelet" type="nodelet" name="local_xrzrgb_kf" output="screen"
+        args="load depth_image_proc/point_cloud_xyzrgb pcl_nodelet_manager">
+    <param name="image_transport" value="compressed"/>
+    <param name="depth_image_transport" value="raw"/>
+    <remap from="rgb/camera_info" to="left_rgb_rect/camera_info"/>
+    <remap from="rgb/image_rect_color" to="left_rgb_rect/image_rect_color_kf"/>
+    <remap from="rgb/image_rect_color/compressed" to="left_rgb_rect/image_rect_color_kf/compressed"/>
+    <remap from="depth_registered/image_rect" to="depth_map/image_kf"/>
+    <remap from="depth_registered/points" to="local_pcl_xyzrgb_kf"/>
+  </node>
+
+  <node pkg="nodelet" type="nodelet" name="local_xyzrgb_concat" output="screen"
+        args="load slamdunk_nodelets/PclXYZRGBConcatNodelet pcl_nodelet_manager">
+    <remap from="pcl_xyzrgb_in" to="local_pcl_xyzrgb_kf"/>
+    <remap from="pcl_xyzrgb_out" to="local_pcl_xyzrgb_concat"/>
+    <remap from="clear" to="local_pcl_xyzrgb_concat_clear"/>
+  </node>
+</launch>
