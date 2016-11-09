@@ -3,7 +3,7 @@
          type="slamdunk_visualization::SLAMDunkPanel"
          base_class_type="rviz::Panel">
     <description>
-      A panel widget allowing control over SLAMDunk node.
+      A panel widget allowing control over slamdunk_node.
     </description>
   </class>
 </library>

@@ -1,8 +1,8 @@
-# ROS SDK for SLAMDunk
+# Parrot S.L.A.M.dunk ROS Integration
 
 Get familiar with ROS: http://wiki.ros.org/indigo/Installation/Ubuntu
 
-S.L.A.M.dunk uses the ROS distribution: indigo
+Parrot S.L.A.M.dunk uses the ROS distribution: indigo
 
 ## Viewing with rqt and rviz
 
@@ -19,7 +19,7 @@ To plot depth and SLAM pose with rviz:
 ### Prerequisites
 
     sudo apt-get update
-    sudo apt-get install build-essential
+    sudo apt-get install build-essential git
 
 ### Prepare Workspace
 

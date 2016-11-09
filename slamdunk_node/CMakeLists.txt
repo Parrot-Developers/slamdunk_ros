@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   octomap_msgs
   pcl_ros
   roscpp
+  rospack
   sensor_msgs
   slamdunk_msgs
   std_msgs

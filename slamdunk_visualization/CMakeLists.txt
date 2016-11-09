@@ -25,7 +25,6 @@ else()
 endif()
 add_definitions(-DQT_NO_KEYWORDS)
 
-# SLAMdunk panel
 add_library(slamdunk_panel
   src/SLAMDunkPanel.cpp
   ${MOC_FILES_PANEL_PLUGIN}
