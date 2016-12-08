@@ -61,6 +61,15 @@ class PclXYZRGBConcatNodelet : public nodelet::Nodelet
     typedef std_srvs::Empty ClearService;
     bool clearServiceCb(ClearService::Request& req, ClearService::Response& resp);
 
+    // rviz Clear service
+    //
+    // rviz will not clear its current displayed pcl if an empty one is received
+    // When this service is called, an invalid-but-not-empty pcl will be sent,
+    // this way rviz will clear its current display.
+    ros::ServiceServer m_rvizClearService;
+    typedef std_srvs::Empty RvizClearService;
+    bool rvizClearServiceCb(RvizClearService::Request& req, RvizClearService::Response& resp);
+
     // Start service
     ros::ServiceServer m_startService;
     typedef std_srvs::Empty StartService;
@@ -78,6 +87,7 @@ class PclXYZRGBConcatNodelet : public nodelet::Nodelet
 
     bool m_started = false;
 
+    boost::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> m_emptyPointCloud;
     boost::shared_ptr<pcl::PointCloud<pcl::PointXYZRGB>> m_pointCloud;
 
     void pointCloudConnectionCallback();
@@ -90,6 +100,7 @@ class PclXYZRGBConcatNodelet : public nodelet::Nodelet
     void insertScan(const tf::Point& sensorOrigin, pcl::PointCloud<pcl::PointXYZRGB> const& pc);
 
     void publish(const ros::Time& stamp);
+    void publish(const ros::Time& stamp, pcl::PointCloud<pcl::PointXYZRGB> const& pointCloud);
 };
 
 }

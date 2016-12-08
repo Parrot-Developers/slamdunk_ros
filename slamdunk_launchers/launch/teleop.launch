@@ -1,6 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  <include file="$(find slamdunk_launchers)/launch/joystick.launch" />
-
-  <include file="$(find slamdunk_launchers)/launch/robot_config.launch" />
-</launch>

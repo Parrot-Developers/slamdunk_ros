@@ -26,57 +26,44 @@
  *
  */
 
-#ifndef SLAMDUNK_PANEL_HPP
-#define SLAMDUNK_PANEL_HPP
+#ifndef SLAMDUNK_QUALITYDISPLAY_HPP
+#define SLAMDUNK_QUALITYDISPLAY_HPP
 
 #ifndef Q_MOC_RUN
-#include <nodelet/loader.h>
 #include <ros/ros.h>
-#include <rviz/panel.h>
+#include <rviz/message_filter_display.h>
+#include <slamdunk_msgs/QualityStamped.h>
 #endif
 
-class QPushButton;
 class QLabel;
+class QTreeView;
 class QStandardItemModel;
 class QStandardItem;
 
 namespace slamdunk_visualization
 {
-class SLAMDunkPanel : public rviz::Panel
+class SLAMDunkQualityDisplay : public rviz::MessageFilterDisplay<slamdunk_msgs::QualityStamped>
 {
     Q_OBJECT
   public:
-    SLAMDunkPanel(QWidget *parent = 0);
+    SLAMDunkQualityDisplay();
+    virtual ~SLAMDunkQualityDisplay();
 
-  private Q_SLOTS:
-    void restartSLAM();
-    void restartCapture();
-    void pclXyzrgbConcatClear();
-    void startStreaming();
-    void stopStreaming();
-    void restartStreaming();
-    void startStreamingReception();
-    void stopStreamingReception();
-
-  private:
-    void callEmptyService(const std::string &serviceName);
-    void createGUI();
-
-  private:
-    ros::NodeHandle m_node;
-    nodelet::Loader m_nodeletLoader;
+    virtual void onInitialize();
+    virtual void onDisable();
+    virtual void onEnable();
 
   protected:
-    QPushButton *m_buttonRestartSLAM = nullptr;
-    QPushButton *m_buttonRestartCapture = nullptr;
-    QPushButton *m_buttonPclXyzrgbConcatClear = nullptr;
-    QPushButton *m_buttonStartStreaming = nullptr;
-    QPushButton *m_buttonStopStreaming = nullptr;
-    QPushButton *m_buttonRestartStreaming = nullptr;
-    QPushButton *m_buttonStartStreamingReception = nullptr;
-    QPushButton *m_buttonStopStreamingReception = nullptr;
-};
+    virtual void processMessage(const slamdunk_msgs::QualityStampedConstPtr &msg);
+    void clear();
 
+  protected:
+    QTreeView *m_treeInfo = nullptr;
+    QStandardItemModel *m_model = nullptr;
+
+    QStandardItem *m_itemQuality = nullptr;
+    QStandardItem *m_qualityValue = nullptr;
+};
 } // end namespace slamdunk_visualization
 
-#endif  // SLAMDUNK_PANEL_HPP
+#endif  // SLAMDUNK_QUALITYDISPLAY_HPP

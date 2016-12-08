@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package>
-  <name>slamdunk_visualization</name>
+  <name>slamdunk_bebop_visualization</name>
   <version>0.0.0</version>
-  <description>Parrot S.L.A.M.dunk visualization utils</description>
+  <description>Bebop visualization utils</description>
 
   <maintainer email="slamdunk@parrot.com">S.L.A.M.dunk</maintainer>
   <license>BSD</license>
@@ -26,6 +26,5 @@
   <run_depend>roscpp</run_depend>
   <run_depend>rviz</run_depend>
   <run_depend>std_msgs</run_depend>
-  <run_depend>rviz_imu_plugin</run_depend>
-  <run_depend>octomap_rviz_plugins</run_depend>
+
 </package>

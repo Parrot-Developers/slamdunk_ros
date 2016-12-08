@@ -28,70 +28,120 @@
 
 #include "SLAMDunkPanel.hpp"
 
-#include <angles/angles.h>
 #include <std_srvs/Empty.h>
-#include <tf/transform_datatypes.h>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
-#include <QStandardItemModel>
 #include <QString>
-#include <QTreeView>
 #include <QVBoxLayout>
 
 namespace slamdunk_visualization
 {
-SLAMDunkPanel::SLAMDunkPanel(QWidget *parent) : rviz::Panel(parent)
+SLAMDunkPanel::SLAMDunkPanel(QWidget *parent) : rviz::Panel(parent), m_nodeletLoader(false)
 {
-    m_poseSub = m_node.subscribe("pose", 1, &SLAMDunkPanel::poseCallback, this);
-    m_qualitySub = m_node.subscribe("quality", 1, &SLAMDunkPanel::qualityCallback, this);
-
     createGUI();
 
     connect(m_buttonRestartSLAM, SIGNAL(clicked()), this, SLOT(restartSLAM()));
     connect(m_buttonRestartCapture, SIGNAL(clicked()), this, SLOT(restartCapture()));
     connect(m_buttonPclXyzrgbConcatClear, SIGNAL(clicked()), this, SLOT(pclXyzrgbConcatClear()));
+    connect(m_buttonStartStreaming, SIGNAL(clicked()), this, SLOT(startStreaming()));
+    connect(m_buttonStopStreaming, SIGNAL(clicked()), this, SLOT(stopStreaming()));
+    connect(m_buttonRestartStreaming, SIGNAL(clicked()), this, SLOT(restartStreaming()));
+    connect(m_buttonStartStreamingReception, SIGNAL(clicked()), this, SLOT(startStreamingReception()));
+    connect(m_buttonStopStreamingReception, SIGNAL(clicked()), this, SLOT(stopStreamingReception()));
 }
 
 void SLAMDunkPanel::restartSLAM()
 {
-    ros::ServiceClient client = m_node.serviceClient<std_srvs::Empty>("restart_slam");
-    std_srvs::Empty srv;
-    if (client.call(srv))
-    {
-        ROS_INFO("restart_slam OK");
-    }
-    else
-    {
-        ROS_ERROR("Failed to call service restart_slam");
-    }
+    callEmptyService("restart_slam");
 }
 
 void SLAMDunkPanel::restartCapture()
 {
-    ros::ServiceClient client = m_node.serviceClient<std_srvs::Empty>("restart_capture");
-    std_srvs::Empty srv;
-    if (client.call(srv))
-    {
-        ROS_INFO("restart_capture OK");
-    }
-    else
-    {
-        ROS_ERROR("Failed to call service restart_capture");
-    }
+    callEmptyService("restart_capture");
 }
 
 void SLAMDunkPanel::pclXyzrgbConcatClear()
 {
-    ros::ServiceClient client = m_node.serviceClient<std_srvs::Empty>("pcl_xyzrgb_concat_clear");
+    callEmptyService("pcl_xyzrgb_concat_clear");
+    callEmptyService("pcl_xyzrgb_concat_rviz_clear");
+}
+
+void SLAMDunkPanel::startStreaming()
+{
+    callEmptyService("start_streaming");
+}
+
+void SLAMDunkPanel::stopStreaming()
+{
+    callEmptyService("stop_streaming");
+}
+
+void SLAMDunkPanel::restartStreaming()
+{
+    callEmptyService("restart_streaming");
+}
+
+void SLAMDunkPanel::startStreamingReception()
+{
+    ROS_INFO("%s", __PRETTY_FUNCTION__);
+    auto loadedNodelets = m_nodeletLoader.listLoadedNodelets();
+
+    std::string cams[] = {"cam0", "cam1"};
+    // TODO get correct ports
+    int ports[] = {5000, 5100};
+
+    for (unsigned i = 0; i < std::extent<decltype(cams)>::value; ++i)
+    {
+        std::string cam = cams[i];
+        int port = ports[i];
+        std::string nodelet_name = cam + "_gscam_nodelet";
+
+        if (std::find(loadedNodelets.begin(), loadedNodelets.end(), nodelet_name) != std::end(loadedNodelets))
+            continue;
+
+        nodelet::M_string remappings(ros::names::getRemappings());
+        nodelet::V_string nargv;
+
+        remappings["camera/image_raw"] = ros::names::resolve(nodelet_name + "/image_raw");
+        remappings["camera/camera_info"] = ros::names::resolve(nodelet_name + "/camera_info");
+        remappings["set_camera_info"] = ros::names::resolve(nodelet_name + "/set_camera_info");
+
+        ros::param::set(nodelet_name + "/frame_id", cam);
+        ros::param::set(nodelet_name + "/sync_sink", false);
+
+        std::stringstream pipelineSs;
+        pipelineSs << "udpsrc port=" << port << " caps=application/x-rtp ! rtph264depay ! avdec_h264 ! "
+                                                "video/x-raw,format=I420 ! videoconvert";
+        ros::param::set(nodelet_name + "/gscam_config", pipelineSs.str());
+
+        m_nodeletLoader.load(nodelet_name, "gscam/GSCamNodelet", remappings, nargv);
+    }
+}
+
+void SLAMDunkPanel::stopStreamingReception()
+{
+    ROS_INFO("%s", __PRETTY_FUNCTION__);
+    auto loadedNodelets = m_nodeletLoader.listLoadedNodelets();
+    std::string cams[] = {"cam0", "cam1"};
+    for (std::string cam : cams)
+    {
+        std::string nodelet_name = cam + "_gscam_nodelet";
+        m_nodeletLoader.unload(nodelet_name);
+    }
+}
+
+void SLAMDunkPanel::callEmptyService(const std::string& serviceName)
+{
+    ros::ServiceClient client = m_node.serviceClient<std_srvs::Empty>(serviceName);
     std_srvs::Empty srv;
     if (client.call(srv))
     {
-        ROS_INFO("pcl_xyzrgb_concat_clear OK");
+        ROS_INFO("%s OK", serviceName.c_str());
     }
     else
     {
-        ROS_ERROR("Failed to call service pcl_xyzrgb_concat_clear");
+        ROS_ERROR("Failed to call service %s", serviceName.c_str());
     }
 }
 
@@ -108,137 +158,22 @@ void SLAMDunkPanel::createGUI()
     m_buttonPclXyzrgbConcatClear = new QPushButton("Clear PCL concat");
     layout->addWidget(m_buttonPclXyzrgbConcatClear);
 
-    m_treeInfo = new QTreeView();
-    m_model = new QStandardItemModel(0, 2);
+    m_buttonStartStreaming = new QPushButton("Start Streaming");
+    layout->addWidget(m_buttonStartStreaming);
 
-    m_itemQuality = new QStandardItem("SLAM quality");
-    m_itemQuality->setEditable(false);
-    m_qualityValue = new QStandardItem("Unknown");
-    m_qualityValue->setEditable(false);
-    m_model->appendRow(QList<QStandardItem *>() << m_itemQuality << m_qualityValue);
+    m_buttonStopStreaming = new QPushButton("Stop Streaming");
+    layout->addWidget(m_buttonStopStreaming);
 
-    QStandardItem *itemPosition = new QStandardItem("Position");
-    itemPosition->setEditable(false);
-    m_allPositionValues = new QStandardItem("0; 0; 0");
-    m_model->appendRow(QList<QStandardItem *>() << itemPosition << m_allPositionValues);
+    m_buttonRestartStreaming = new QPushButton("Restart Streaming");
+    layout->addWidget(m_buttonRestartStreaming);
 
-    QStandardItem *namePositionX = new QStandardItem(QString("X"));
-    namePositionX->setEditable(false);
+    m_buttonStartStreamingReception = new QPushButton("Start Streaming Reception");
+    layout->addWidget(m_buttonStartStreamingReception);
 
-    QStandardItem *namePositionY = new QStandardItem(QString("Y"));
-    namePositionY->setEditable(false);
-
-    QStandardItem *namePositionZ = new QStandardItem(QString("Z"));
-    namePositionZ->setEditable(false);
-
-    m_valuePositionX = new QStandardItem(QString("0"));
-    m_valuePositionX->setEditable(false);
-
-    m_valuePositionY = new QStandardItem(QString("0"));
-    m_valuePositionY->setEditable(false);
-
-    m_valuePositionZ = new QStandardItem(QString("0"));
-    m_valuePositionZ->setEditable(false);
-
-    itemPosition->appendRow(QList<QStandardItem *>() << namePositionX << m_valuePositionX);
-    itemPosition->appendRow(QList<QStandardItem *>() << namePositionY << m_valuePositionY);
-    itemPosition->appendRow(QList<QStandardItem *>() << namePositionZ << m_valuePositionZ);
-
-    QStandardItem *itemOrientation = new QStandardItem("Orientation");
-    itemOrientation->setEditable(false);
-    m_allOrientationValues = new QStandardItem("0; 0; 0");
-    m_model->appendRow(QList<QStandardItem *>() << itemOrientation << m_allOrientationValues);
-
-    QStandardItem *nameOrientationYaw = new QStandardItem(QString("Yaw"));
-    nameOrientationYaw->setEditable(false);
-
-    QStandardItem *nameOrientationPitch = new QStandardItem(QString("Pitch"));
-    nameOrientationPitch->setEditable(false);
-
-    QStandardItem *nameOrientationRoll = new QStandardItem(QString("Roll"));
-    nameOrientationRoll->setEditable(false);
-
-    m_valueOrientationYaw = new QStandardItem(QString("0"));
-    m_valueOrientationYaw->setEditable(false);
-
-    m_valueOrientationPitch = new QStandardItem(QString("0"));
-    m_valueOrientationPitch->setEditable(false);
-
-    m_valueOrientationRoll = new QStandardItem(QString("0"));
-    m_valueOrientationRoll->setEditable(false);
-
-    itemOrientation->appendRow(QList<QStandardItem *>() << nameOrientationYaw << m_valueOrientationYaw);
-    itemOrientation->appendRow(QList<QStandardItem *>() << nameOrientationPitch << m_valueOrientationPitch);
-    itemOrientation->appendRow(QList<QStandardItem *>() << nameOrientationRoll << m_valueOrientationRoll);
-
-    m_treeInfo->header()->hide();
-    m_treeInfo->setModel(m_model);
-    m_treeInfo->resizeColumnToContents(0);
-    m_treeInfo->setAnimated(true);
-
-    layout->addWidget(m_treeInfo);
+    m_buttonStopStreamingReception = new QPushButton("Stop Streaming Reception");
+    layout->addWidget(m_buttonStopStreamingReception);
 
     setLayout(layout);
-}
-
-void SLAMDunkPanel::poseCallback(const geometry_msgs::PoseStampedConstPtr &msg)
-{
-    const int precision = 2;
-    QString positionX = QString::number(msg->pose.position.x, 'f', precision);
-    QString positionY = QString::number(msg->pose.position.y, 'f', precision);
-    QString positionZ = QString::number(msg->pose.position.z, 'f', precision);
-
-    m_allPositionValues->setText(positionX + "; " + positionY + "; " + positionZ);
-
-    m_valuePositionX->setText(positionX);
-    m_valuePositionY->setText(positionY);
-    m_valuePositionZ->setText(positionZ);
-
-    tf::Quaternion quatOrientation(msg->pose.orientation.x, msg->pose.orientation.y, msg->pose.orientation.z,
-                                   msg->pose.orientation.w);
-    tf::Matrix3x3 matOrientation(quatOrientation);
-    double roll, pitch, yaw;
-    matOrientation.getRPY(roll, pitch, yaw);
-
-    QString orientationYaw = QString::number(angles::to_degrees(yaw), 'f', precision);
-    QString orientationPitch = QString::number(angles::to_degrees(pitch), 'f', precision);
-    QString orientationRoll = QString::number(angles::to_degrees(roll), 'f', precision);
-
-    m_allOrientationValues->setText(orientationYaw + "; " + orientationPitch + "; " + orientationRoll);
-
-    m_valueOrientationYaw->setText(orientationYaw);
-    m_valueOrientationPitch->setText(orientationPitch);
-    m_valueOrientationRoll->setText(orientationRoll);
-}
-
-void SLAMDunkPanel::qualityCallback(const slamdunk_msgs::QualityStampedConstPtr &msg)
-{
-    QColor itemBackgroundColor = Qt::white;
-    switch (msg->quality.value)
-    {
-        case slamdunk_msgs::Quality::UNKNOWN:
-            m_qualityValue->setText("Unknown");
-            itemBackgroundColor = Qt::white;
-            break;
-        case slamdunk_msgs::Quality::GOOD:
-            m_qualityValue->setText("Good");
-            itemBackgroundColor = Qt::green;
-            break;
-        case slamdunk_msgs::Quality::HAZARDOUS:
-            m_qualityValue->setText("Hazardous");
-            itemBackgroundColor = Qt::yellow;
-            break;
-        case slamdunk_msgs::Quality::BAD:
-            m_qualityValue->setText("Bad");
-            itemBackgroundColor = Qt::red;
-            break;
-        case slamdunk_msgs::Quality::LOST:
-            m_qualityValue->setText("Lost");
-            itemBackgroundColor = Qt::red;
-            break;
-    }
-    m_qualityValue->setBackground(QBrush(itemBackgroundColor));
-    m_itemQuality->setBackground(QBrush(itemBackgroundColor));
 }
 
 }  // end namespace slamdunk_visualization

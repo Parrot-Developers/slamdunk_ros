@@ -12,6 +12,9 @@ add_message_files(
   BoolStamped.msg
   Quality.msg
   QualityStamped.msg
+  ReconfigureLevels.msg
+  VideoModes.msg
+  VideoSources.msg
 )
 
 add_service_files(

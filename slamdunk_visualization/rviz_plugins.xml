@@ -1,9 +1,25 @@
-<library path="lib/libslamdunk_panel">
+<library path="lib/libslamdunk_rvizplugins">
   <class name="slamdunk_visualization/SLAMDunkPanel"
          type="slamdunk_visualization::SLAMDunkPanel"
          base_class_type="rviz::Panel">
     <description>
       A panel widget allowing control over slamdunk_node.
     </description>
+  </class>
+  <class name="slamdunk_visualization/SLAMDunkPoseDisplay"
+         type="slamdunk_visualization::SLAMDunkPoseDisplay"
+         base_class_type="rviz::Display">
+    <description>
+      A display for viewing the pose and the pose quality indicator.
+    </description>
+    <message_type>geometry_msgs/PoseStamped</message_type>
+  </class>
+  <class name="slamdunk_visualization/SLAMDunkQualityDisplay"
+         type="slamdunk_visualization::SLAMDunkQualityDisplay"
+         base_class_type="rviz::Display">
+    <description>
+      A display for viewing the pose and the pose quality indicator.
+    </description>
+    <message_type>slamdunk_msgs/QualityStamped</message_type>
   </class>
 </library>

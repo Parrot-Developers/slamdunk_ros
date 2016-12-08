@@ -99,7 +99,7 @@ CURRENT_DATE=$(date '+%s')
 DEVICE_DATE=$(ssh ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} date '+%s')
 DIFF_DATE=$((${CURRENT_DATE}-${DEVICE_DATE}))
 if [ "${DEVICE_DATE}" -gt "${CURRENT_DATE}" ] || [ "${DIFF_DATE}" -gt "1" ]; then
-  echo "Setting SLAMDunk date ..."
+  echo "Setting Parrot S.L.A.M.dunk date ..."
   ssh -t ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} "echo slamdunk | sudo -S date -s '@$(date +%s)'"
 fi
 

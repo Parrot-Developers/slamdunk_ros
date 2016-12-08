@@ -2,7 +2,7 @@
 <package>
   <name>slamdunk_node</name>
   <version>0.0.0</version>
-  <description>SLAMDunk main node</description>
+  <description>Parrot S.L.A.M.dunk main node</description>
 
   <maintainer email="slamdunk@parrot.com">S.L.A.M.dunk</maintainer>
   <license>BSD</license>

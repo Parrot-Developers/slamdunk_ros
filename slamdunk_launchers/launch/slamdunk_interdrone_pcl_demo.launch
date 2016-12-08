@@ -1,8 +1,0 @@
-<?xml version="1.0"?>
-<launch>
-  <node pkg="rviz" type="rviz" name="rviz" output="screen"
-        args="-d $(find slamdunk_visualization)/rviz/slamdunk_interdrone_flight_demo.rviz" required="true">
-    <remap from="pcl_xyzrgb_concat_clear" to="local_xyzrgb_concat/clear"/>
-  </node>
-  <include file="$(find slamdunk_launchers)/launch/local_xyzrgb_concat.launch" />
-</launch>

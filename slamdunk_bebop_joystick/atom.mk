@@ -2,15 +2,12 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_MODULE := ros-slamdunk-node
+LOCAL_MODULE := ros-bebop-joystick
 LOCAL_CATEGORY_PATH := ros_packages
-LOCAL_DESCRIPTION := Parrot S.L.A.M.dunk main ROS node
+LOCAL_DESCRIPTION := bebop joystick control
 
 LOCAL_LIBRARIES := \
-	libkalamos-context \
-	ros-indigo-export \
-	ros-slamdunk-msgs \
-	ros-slamdunk-nodelets
+	ros-indigo-export
 
 SLAMDUNK_ROS_SDK_BUILD_DIR := $(call local-get-build-dir)/../ros-slamdunk/devel
 
@@ -22,8 +19,5 @@ LOCAL_CMAKE_CONFIGURE_ARGS = \
 ifeq ("$(TARGET_CPU)", "tegrak1")
 LOCAL_CMAKE_CONFIGURE_ARGS += -DCMAKE_INSTALL_PREFIX=/opt/ros-slamdunk/
 endif
-
-LOCAL_COPY_FILES := \
-	../README.md:opt/ros-slamdunk/share/slamdunk_node/
 
 include $(BUILD_CMAKE)

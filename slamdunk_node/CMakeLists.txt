@@ -11,7 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   octomap_msgs
   pcl_ros
   roscpp
-  rospack
+  rospack # workaround https://github.com/ros/ros/issues/128
   sensor_msgs
   slamdunk_msgs
   std_msgs
@@ -21,6 +21,8 @@ find_package(catkin REQUIRED COMPONENTS
 generate_dynamic_reconfigure_options(
   cfg/SLAMDunkNode.cfg
 )
+
+add_dependencies(${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
 
 catkin_package(CATKIN_DEPENDS roscpp)
 
@@ -57,6 +59,11 @@ add_dependencies(slamdunk_node
 install(TARGETS
         slamdunk_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+install(DIRECTORY
+  launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
 
 catkin_install_python(PROGRAMS
   cfg/SLAMDunkNode.cfg

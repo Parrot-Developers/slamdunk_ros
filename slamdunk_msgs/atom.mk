@@ -4,7 +4,7 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := ros-slamdunk-msgs
 LOCAL_CATEGORY_PATH := ros_packages
-LOCAL_DESCRIPTION := SLAMDunk ros msgs
+LOCAL_DESCRIPTION := Parrot S.L.A.M.dunk ROS msgs
 
 LOCAL_LIBRARIES := \
 	ros-indigo-export

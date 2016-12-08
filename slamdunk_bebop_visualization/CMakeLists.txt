@@ -1,12 +1,10 @@
 cmake_minimum_required(VERSION 2.8.12)
-project(slamdunk_visualization)
+project(slamdunk_bebop_visualization)
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
-  nodelet
   roscpp
   rviz
-  slamdunk_msgs
   std_srvs
 )
 
@@ -26,30 +24,22 @@ else()
 endif()
 add_definitions(-DQT_NO_KEYWORDS)
 
-add_library(slamdunk_rvizplugins
-  src/SLAMDunkPanel.cpp
-  src/SLAMDunkPoseDisplay.cpp
-  src/SLAMDunkQualityDisplay.cpp
+# ARSDK panel
+add_library(arsdk_panel
+  src/ARSDKPanel.cpp
+  ${MOC_FILES_PANEL_PLUGIN}
 )
-target_compile_options(slamdunk_rvizplugins PUBLIC -std=c++11)
-target_link_libraries(slamdunk_rvizplugins ${QT_LIBRARIES} ${catkin_LIBRARIES})
-add_dependencies(slamdunk_rvizplugins
+target_compile_options(arsdk_panel PUBLIC -std=c++11)
+target_link_libraries(arsdk_panel ${QT_LIBRARIES} ${catkin_LIBRARIES})
+add_dependencies(arsdk_panel
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
   ${catkin_EXPORTED_TARGETS}
 )
 
 install(TARGETS
-  slamdunk_rvizplugins
+  arsdk_panel
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-install(DIRECTORY
-  rviz
-  rqt
-  urdf
-  models
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
 install(FILES

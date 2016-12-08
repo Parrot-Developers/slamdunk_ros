@@ -1,0 +1,48 @@
+teleop:
+  takeoff:
+    type: topic
+    message_type: "std_msgs/Empty"
+    topic_name: bebop_node/start
+    deadman_buttons: [3]  # Y
+    axis_mappings: []
+
+  land:
+    type: topic
+    message_type: "std_msgs/Empty"
+    topic_name: bebop_node/stop
+    deadman_buttons: [1]  # B
+    axis_mappings: []
+
+  emergency:
+    type: topic
+    message_type: "std_msgs/Empty"
+    topic_name: bebop_node/emergency
+    deadman_buttons: [8] # Logitech button
+    axis_mappings: []
+
+  pcmd:
+    type: topic
+    message_type: "geometry_msgs/Twist"
+    topic_name: bebop_node/pilotingVelocity
+    deadman_buttons: [5]
+    axis_mappings:
+      -
+        axis: 0
+        target: angular.z
+        scale: -100.0
+        offset: 0.0
+      -
+        axis: 1
+        target: linear.z
+        scale: 100.0
+        offset: 0.0
+      -
+        axis: 3
+        target: linear.y
+        scale: -100.0
+        offset: 0.0
+      -
+        axis: 4
+        target: linear.x
+        scale: 100.0
+        offset: 0.0

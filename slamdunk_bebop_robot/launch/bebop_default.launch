@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+  <include file="$(find slamdunk_bebop_robot)/launch/bebop_nodelet.launch" />
+  <include file="$(find slamdunk_bebop_robot)/launch/bebop_config.launch" />
+</launch>

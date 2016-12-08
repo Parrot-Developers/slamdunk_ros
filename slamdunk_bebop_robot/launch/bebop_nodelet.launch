@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="bebop_ip" default="192.168.43.1" />
+
+  <node name="bebop_node" pkg="slamdunk_bebop_robot" type="bebop_node" output="screen">
+    <param name="bebop_ip" value="$(arg bebop_ip)" />
+  </node>
+</launch>

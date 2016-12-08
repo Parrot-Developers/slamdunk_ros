@@ -26,57 +26,46 @@
  *
  */
 
-#ifndef SLAMDUNK_PANEL_HPP
-#define SLAMDUNK_PANEL_HPP
+#ifndef ARSDKPANEL_HPP
+#define ARSDKPANEL_HPP
 
 #ifndef Q_MOC_RUN
-#include <nodelet/loader.h>
 #include <ros/ros.h>
+
 #include <rviz/panel.h>
 #endif
 
-class QPushButton;
+#include <std_msgs/Float32.h>
+
 class QLabel;
+class QTreeView;
 class QStandardItemModel;
 class QStandardItem;
 
-namespace slamdunk_visualization
+namespace slamdunk_bebop_visualization
 {
-class SLAMDunkPanel : public rviz::Panel
+class ARSDKPanel : public rviz::Panel
 {
     Q_OBJECT
   public:
-    SLAMDunkPanel(QWidget *parent = 0);
-
-  private Q_SLOTS:
-    void restartSLAM();
-    void restartCapture();
-    void pclXyzrgbConcatClear();
-    void startStreaming();
-    void stopStreaming();
-    void restartStreaming();
-    void startStreamingReception();
-    void stopStreamingReception();
+    ARSDKPanel(QWidget *parent = 0);
 
   private:
-    void callEmptyService(const std::string &serviceName);
     void createGUI();
+    void batteryStateChangedCallback(const std_msgs::Float32ConstPtr &msg);
 
   private:
     ros::NodeHandle m_node;
-    nodelet::Loader m_nodeletLoader;
+    ros::Subscriber m_batteryStateChangedSub;
 
   protected:
-    QPushButton *m_buttonRestartSLAM = nullptr;
-    QPushButton *m_buttonRestartCapture = nullptr;
-    QPushButton *m_buttonPclXyzrgbConcatClear = nullptr;
-    QPushButton *m_buttonStartStreaming = nullptr;
-    QPushButton *m_buttonStopStreaming = nullptr;
-    QPushButton *m_buttonRestartStreaming = nullptr;
-    QPushButton *m_buttonStartStreamingReception = nullptr;
-    QPushButton *m_buttonStopStreamingReception = nullptr;
+    QTreeView *m_treeInfo = nullptr;
+    QStandardItemModel *m_model = nullptr;
+
+    QStandardItem *m_itemBatteryState = nullptr;
+    QStandardItem *m_batteryStateValue = nullptr;
 };
 
-} // end namespace slamdunk_visualization
+}  // end namespace slamdunk_bebop_visualization
 
-#endif  // SLAMDUNK_PANEL_HPP
+#endif  // ARSDKPANEL_HPP

@@ -39,7 +39,6 @@
 
 #include "kalamos_context.hpp"
 
-// ROS
 #include <cv_bridge/cv_bridge.h>
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -49,6 +48,9 @@
 #include <interactive_markers/menu_handler.h>
 #include <slamdunk_msgs/BoolStamped.h>
 #include <slamdunk_msgs/QualityStamped.h>
+#include <slamdunk_msgs/ReconfigureLevels.h>
+#include <slamdunk_msgs/VideoModes.h>
+#include <slamdunk_msgs/VideoSources.h>
 #include <slamdunk_node/SLAMDunkNodeConfig.h>
 #include <octomap/OcTree.h>
 #include <octomap_msgs/conversions.h>
@@ -66,6 +68,7 @@
 #include <stereo_msgs/DisparityImage.h>
 #include <std_msgs/Bool.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Float32.h>
 #include <std_srvs/Empty.h>
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2/LinearMath/Quaternion.h>
@@ -93,6 +96,7 @@ namespace
             , m_ultrasoundPublisher(n.advertise<sensor_msgs::Range>("ultrasound", 1))
             , m_barometerPublisher(n.advertise<sensor_msgs::FluidPressure>("barometer", 1))
             , m_magnetometerPublisher(n.advertise<sensor_msgs::MagneticField>("magnetometer", 1))
+            , m_processingImageRatePublisher(n.advertise<std_msgs::Float32>("processing_image_rate", 1))
             , m_keyframePublisher(n.advertise<slamdunk_msgs::BoolStamped>("keyframe", 1))
             , m_qualityPublisher(n.advertise<slamdunk_msgs::QualityStamped>("quality", 1))
 
@@ -115,6 +119,9 @@ namespace
             m_restartCaptureService = n.advertiseService("restart_capture", &Context::restartCaptureServiceCb, this);
             m_restartSlamService = n.advertiseService("restart_slam", &Context::restartSlamServiceCb, this);
             m_restartOccupancyService = n.advertiseService("restart_occupancy", &Context::restartOccupancyServiceCb, this);
+            m_startStreamingService = n.advertiseService("start_streaming", &Context::startStreamingServiceCb, this);
+            m_restartStreamingService = n.advertiseService("restart_streaming", &Context::restartStreamingServiceCb, this);
+            m_stopStreamingService = n.advertiseService("stop_streaming", &Context::stopStreamingServiceCb, this);
 
             m_dynamicReconfigureServer.setCallback(boost::bind(&Context::dynamicReconfigureCb, this, _1, _2));
 
@@ -123,6 +130,7 @@ namespace
 
         void setKalamosContext(kalamos::Context* c);
         void tick();
+        void handleSensorsActivation();
 
         void depthmapPublish(kalamos::DepthmapData const& dm);
         void dispmapPublish(kalamos::DispmapData const& dm);
@@ -132,6 +140,7 @@ namespace
         void ultrasoundPublish(kalamos::UltrasoundData const& ultrasoundData);
         void barometerPublish(kalamos::BarometerData const& barometerData);
         void magnetometerPublish(kalamos::MagnetometerData const& magnetometerData);
+        void processingImageInfoPublish(kalamos::ProcessingImageInfoData const& processingImageInfoData);
 
         void onStereoYuvData(kalamos::StereoYuvData const& stereoYuvData);
 
@@ -156,16 +165,28 @@ namespace
         bool restartCapture();
         bool restartSlam();
         bool restartOccupancy();
+        bool startStreaming();
+        bool restartStreaming();
+        bool stopStreaming();
         // Services
         typedef std_srvs::Empty RestartCaptureSrv;
         typedef std_srvs::Empty RestartSlamSrv;
         typedef std_srvs::Empty RestartOccupancySrv;
+        typedef std_srvs::Empty StartStreamingSrv;
+        typedef std_srvs::Empty RestartStreamingSrv;
+        typedef std_srvs::Empty StopStreamingSrv;
         bool restartCaptureServiceCb(RestartCaptureSrv::Request& req, RestartCaptureSrv::Response& resp);
         bool restartSlamServiceCb(RestartSlamSrv::Request& req, RestartSlamSrv::Response& resp);
         bool restartOccupancyServiceCb(RestartOccupancySrv::Request& req, RestartOccupancySrv::Response& resp);
+        bool startStreamingServiceCb(StartStreamingSrv::Request& req, StartStreamingSrv::Response& resp);
+        bool restartStreamingServiceCb(RestartStreamingSrv::Request& req, RestartStreamingSrv::Response& resp);
+        bool stopStreamingServiceCb(StopStreamingSrv::Request& req, StopStreamingSrv::Response& resp);
         ros::ServiceServer m_restartCaptureService;
         ros::ServiceServer m_restartSlamService;
         ros::ServiceServer m_restartOccupancyService;
+        ros::ServiceServer m_startStreamingService;
+        ros::ServiceServer m_restartStreamingService;
+        ros::ServiceServer m_stopStreamingService;
 
     private:
         ros::NodeHandle& m_rosNode;
@@ -180,6 +201,7 @@ namespace
         std::unique_ptr<kalamos::ServiceHandle> m_captureHandle;
         std::unique_ptr<kalamos::ServiceHandle> m_slamHandle;
         std::unique_ptr<kalamos::ServiceHandle> m_occupancyHandle;
+        std::unique_ptr<kalamos::ServiceHandle> m_streamingHandle;
 
         image_transport::CameraPublisher m_depthmapPublisher;
         image_transport::CameraPublisher m_dispmapPublisher;
@@ -208,6 +230,8 @@ namespace
         ros::Publisher m_barometerPublisher;
         ros::Publisher m_magnetometerPublisher;
 
+        ros::Publisher m_processingImageRatePublisher;
+
         ros::Publisher m_keyframePublisher;
         ros::Publisher m_qualityPublisher;
 
@@ -215,6 +239,9 @@ namespace
         dynamic_reconfigure::Server<slamdunk_node::SLAMDunkNodeConfig> m_dynamicReconfigureServer;
         void dynamicReconfigureCb(slamdunk_node::SLAMDunkNodeConfig& config, uint32_t level);
         slamdunk_node::SLAMDunkNodeConfig m_config;
+        void forwardStreamingOptions();
+        void forwardVideoMode();
+        void forwardVideoSource();
 
         // menu
         std::shared_ptr<interactive_markers::InteractiveMarkerServer> m_menuServer;
@@ -222,9 +249,18 @@ namespace
         interactive_markers::MenuHandler::EntryHandle m_menuRestartCaptureHandle;
         interactive_markers::MenuHandler::EntryHandle m_menuRestartSlamHandle;
         interactive_markers::MenuHandler::EntryHandle m_menuRestartOccupancyHandle;
+        interactive_markers::MenuHandler::EntryHandle m_menuStartStreamingHandle;
+        interactive_markers::MenuHandler::EntryHandle m_menuRestartStreamingHandle;
+        interactive_markers::MenuHandler::EntryHandle m_menuStopStreamingHandle;
         void menuRestartCaptureCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
         void menuRestartSlamCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
         void menuRestartOccupancyCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
+        void menuStartStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
+        void menuRestartStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
+        void menuStopStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
+        bool m_withBarometer = false;
+        bool m_withMagnetometer = false;
+        bool m_withUltrasound = false;
     };
 
     void Context::setKalamosContext(kalamos::Context* c)
@@ -249,6 +285,89 @@ namespace
                 m_rosNode.setParam("properties/" + topicName, m_kalamosContext->getProperty(pair.first, pair.second));
             }
         }
+        forwardStreamingOptions();
+        forwardVideoMode();
+        forwardVideoSource();
+    }
+
+    void Context::forwardStreamingOptions()
+    {
+        if (!m_kalamosContext)
+            return;
+
+        kalamos::StreamingOptions options;
+        options.cropWidth = m_config.streaming_crop_width;
+        options.cropHeight = m_config.streaming_crop_height;
+        options.rescaleWidth = m_config.streaming_rescale_width;
+        options.rescaleHeight = m_config.streaming_rescale_height;
+        options.host = m_config.streaming_host;
+        options.portLeft = m_config.streaming_port_left;
+        options.portRight = m_config.streaming_port_right;
+        options.bitrate = m_config.streaming_bitrate;
+        m_kalamosContext->setStreamingOptions(options);
+    }
+
+    void Context::forwardVideoMode()
+    {
+        if (!m_kalamosContext)
+            return;
+
+        std::string videoModeStr;
+        kalamos::VideoMode videoMode;
+        switch (m_config.video_mode)
+        {
+            default:
+            case slamdunk_msgs::VideoModes::MODE_AUTO:
+                videoMode = kalamos::VideoMode::MODE_AUTO;
+                videoModeStr = "auto";
+                break;
+            case slamdunk_msgs::VideoModes::MODE_1280_960_30:
+                videoMode = kalamos::VideoMode::MODE_1280_960_30;
+                videoModeStr = "1280x960 30fps";
+                break;
+            case slamdunk_msgs::VideoModes::MODE_1500_1500_30:
+                videoMode = kalamos::VideoMode::MODE_1500_1500_30;
+                videoModeStr = "1500x1500 30fps";
+                break;
+            case slamdunk_msgs::VideoModes::MODE_1500_1500_60:
+                videoMode = kalamos::VideoMode::MODE_1500_1500_60;
+                videoModeStr = "1500x1500 60fps";
+                break;
+            case slamdunk_msgs::VideoModes::MODE_900_700_120:
+                videoMode = kalamos::VideoMode::MODE_900_700_120;
+                videoModeStr = "900x700 120fps";
+                break;
+        }
+        ROS_INFO("Set video mode: %s", videoModeStr.c_str());
+        m_kalamosContext->setVideoMode(videoMode);
+    }
+
+    void Context::forwardVideoSource()
+    {
+        if (!m_kalamosContext)
+            return;
+
+        std::string videoSourceStr;
+        kalamos::VideoSource videoSource;
+        switch (m_config.video_source)
+        {
+            default:
+            case slamdunk_msgs::VideoSources::SOURCE_LIVE:
+                videoSource = kalamos::VideoSource::SOURCE_LIVE;
+                videoSourceStr = "live";
+                break;
+            case slamdunk_msgs::VideoSources::SOURCE_VDEC_SW:
+                videoSource = kalamos::VideoSource::SOURCE_VDEC_SW;
+                videoSourceStr = "offline";
+                break;
+            case slamdunk_msgs::VideoSources::SOURCE_VDEC_HW:
+                videoSource = kalamos::VideoSource::SOURCE_VDEC_HW;
+                videoSourceStr = "offline";
+                break;
+        }
+        ROS_INFO("Set video source: %s", videoSourceStr.c_str());
+
+        m_kalamosContext->setVideoSource(videoSource);
     }
 
     void Context::depthmapPublish(kalamos::DepthmapData const& dm)
@@ -709,6 +828,13 @@ namespace
         m_magnetometerPublisher.publish(message);
     }
 
+    void Context::processingImageInfoPublish(kalamos::ProcessingImageInfoData const& processingImageInfoData)
+    {
+        std_msgs::Float32 message;
+        message.data = processingImageInfoData.fps;
+        m_processingImageRatePublisher.publish(message);
+    }
+
     void Context::onStereoYuvData(kalamos::StereoYuvData const& stereoYuvData)
     {
         cv::Size rectCropSize(m_kalamosContext->getCropSize());
@@ -807,6 +933,12 @@ namespace
             m_menuHandle.insert("Restart slam", boost::bind(&Context::menuRestartSlamCb, this, _1));
         m_menuRestartOccupancyHandle =
             m_menuHandle.insert("Restart occupancy", boost::bind(&Context::menuRestartOccupancyCb, this, _1));
+        m_menuStartStreamingHandle =
+            m_menuHandle.insert("Start streaming", boost::bind(&Context::menuStartStreamingCb, this, _1));
+        m_menuRestartStreamingHandle =
+            m_menuHandle.insert("Restart streaming", boost::bind(&Context::menuRestartStreamingCb, this, _1));
+        m_menuStopStreamingHandle =
+            m_menuHandle.insert("Stop streaming", boost::bind(&Context::menuStopStreamingCb, this, _1));
 
         visualization_msgs::InteractiveMarker int_marker;
         int_marker.header.frame_id = "cam0";
@@ -924,6 +1056,49 @@ namespace
         return m_occupancyHandle->restart();
     }
 
+    bool Context::startStreaming()
+    {
+        ROS_INFO("start streaming requested...");
+        if (m_streamingHandle)
+        {
+            ROS_INFO("... but streaming was started already");
+            return false;
+        }
+        m_streamingHandle = m_kalamosContext->startService(kalamos::ServiceType::STREAMING);
+        if (!m_streamingHandle)
+            ROS_INFO("could not start streaming");
+        return !!m_streamingHandle;
+    }
+
+    bool Context::restartStreaming()
+    {
+        ROS_INFO("restart streaming requested...");
+        if (!m_streamingHandle)
+        {
+            ROS_INFO("... but streaming was not started to begin with");
+            return false;
+        }
+        m_streamingHandle->restart();
+        if (!m_streamingHandle->isValid())
+        {
+            m_streamingHandle.reset();
+            ROS_INFO("could not start streaming");
+        }
+        return !!m_streamingHandle;
+    }
+
+    bool Context::stopStreaming()
+    {
+        ROS_INFO("stop streaming requested...");
+        if (!m_streamingHandle)
+        {
+            ROS_INFO("... but streaming was not started to begin with");
+            return false;
+        }
+        m_streamingHandle.reset();
+        return true;
+    }
+
     bool Context::restartCaptureServiceCb(RestartCaptureSrv::Request& req, RestartCaptureSrv::Response& resp)
     {
         return restartCapture();
@@ -937,6 +1112,21 @@ namespace
     bool Context::restartOccupancyServiceCb(RestartOccupancySrv::Request& req, RestartOccupancySrv::Response& resp)
     {
         return restartOccupancy();
+    }
+
+    bool Context::startStreamingServiceCb(StartStreamingSrv::Request& req, StartStreamingSrv::Response& resp)
+    {
+        return startStreaming();
+    }
+
+    bool Context::restartStreamingServiceCb(RestartStreamingSrv::Request& req, RestartStreamingSrv::Response& resp)
+    {
+        return restartStreaming();
+    }
+
+    bool Context::stopStreamingServiceCb(StopStreamingSrv::Request& req, StopStreamingSrv::Response& resp)
+    {
+        return stopStreaming();
     }
 
     void Context::menuRestartCaptureCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
@@ -954,14 +1144,54 @@ namespace
         restartOccupancy();
     }
 
+    void Context::menuStartStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
+    {
+        startStreaming();
+    }
+
+    void Context::menuRestartStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
+    {
+        restartStreaming();
+    }
+
+    void Context::menuStopStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
+    {
+        stopStreaming();
+    }
+
     void Context::dynamicReconfigureCb(slamdunk_node::SLAMDunkNodeConfig& config, uint32_t level)
     {
-        ROS_INFO("Reconfigure Request: %d %d %d",
-                 level,
-                 config.crop_width,
-                 config.crop_height);
-
         m_config = config;
+
+        if (level & slamdunk_msgs::ReconfigureLevels::NODE)
+        {
+            ROS_INFO("NODE Reconfigure Request:\ncrop: %dx%d", config.crop_width, config.crop_height);
+        }
+
+        // streaming configuration
+        if (level & slamdunk_msgs::ReconfigureLevels::STREAMING)
+        {
+            ROS_INFO("STREAMING Reconfigure Request:\ncrop: %dx%d, rescale %dx%d\nhost %s, ports: (%d,%d)\nbitrate %d",
+                     config.streaming_crop_width, config.streaming_crop_height, config.streaming_rescale_width,
+                     config.streaming_rescale_height, config.streaming_host.c_str(), config.streaming_port_left,
+                     config.streaming_port_right, config.streaming_bitrate);
+
+            forwardStreamingOptions();
+        }
+
+        if (level & slamdunk_msgs::ReconfigureLevels::VIDEO_MODE)
+        {
+            ROS_INFO("VIDEO_MODE Reconfigure Request");
+
+            forwardVideoMode();
+        }
+
+        if (level & slamdunk_msgs::ReconfigureLevels::VIDEO_SOURCE)
+        {
+            ROS_INFO("VIDEO_SOURCE Reconfigure Request");
+
+            forwardVideoSource();
+        }
     }
 
     void Context::onClockOffsetTimerCallback(const ros::TimerEvent& e)
@@ -1020,7 +1250,8 @@ namespace
             !!m_imuPublisher.getNumSubscribers() ||
             !!m_ultrasoundPublisher.getNumSubscribers() ||
             !!m_barometerPublisher.getNumSubscribers() ||
-            !!m_magnetometerPublisher.getNumSubscribers();
+            !!m_magnetometerPublisher.getNumSubscribers() ||
+            !!m_processingImageRatePublisher.getNumSubscribers();
 
         if (needCapture && !m_captureHandle)
         {
@@ -1063,8 +1294,66 @@ namespace
             ROS_INFO("stop capture");
             m_captureHandle.reset();
         }
+        handleSensorsActivation();
     }
 
+    void Context::handleSensorsActivation()
+    {
+        if (m_ultrasoundPublisher.getNumSubscribers() > 0)
+        {
+            if (!m_withUltrasound)
+            {
+                ROS_INFO("With ultrasound %d", m_ultrasoundPublisher.getNumSubscribers());
+                m_withUltrasound = true;
+                m_kalamosContext->activateSensor(kalamos::SensorType::ULTRASOUND);
+            }
+        }
+        else
+        {
+            if (m_withUltrasound)
+            {
+                ROS_INFO("Without ultrasound");
+                m_withUltrasound = false;
+                m_kalamosContext->deactivateSensor(kalamos::SensorType::ULTRASOUND);
+            }
+        }
+        if (m_barometerPublisher.getNumSubscribers() > 0)
+        {
+            if (!m_withBarometer)
+            {
+                ROS_INFO("With barometer %d", m_barometerPublisher.getNumSubscribers());
+                m_withBarometer = true;
+                m_kalamosContext->activateSensor(kalamos::SensorType::BAROMETER);
+            }
+        }
+        else
+        {
+            if (m_withBarometer)
+            {
+                ROS_INFO("Without barometer");
+                m_withBarometer = false;
+                m_kalamosContext->deactivateSensor(kalamos::SensorType::BAROMETER);
+            }
+        }
+        if (m_magnetometerPublisher.getNumSubscribers() > 0)
+        {
+            if (!m_withMagnetometer)
+            {
+                ROS_INFO("With magnetometer %d", m_magnetometerPublisher.getNumSubscribers());
+                m_withMagnetometer = true;
+                m_kalamosContext->activateSensor(kalamos::SensorType::MAGNETOMETER);
+            }
+        }
+        else
+        {
+            if (m_withMagnetometer)
+            {
+                ROS_INFO("Without magnetometer");
+                m_withMagnetometer = false;
+                m_kalamosContext->deactivateSensor(kalamos::SensorType::MAGNETOMETER);
+            }
+        }
+    }
 }
 
 int main(int ac, char** av)
@@ -1252,10 +1541,10 @@ int main(int ac, char** av)
         remappings["pcl_xyzrgb_in"] = ros::names::resolve("pcl_xyzrgb_kf_good");
         remappings["pcl_xyzrgb_out"] = ros::names::resolve("pcl_xyzrgb_concat");
         remappings["clear"] = ros::names::resolve("pcl_xyzrgb_concat_clear");
+        remappings["rviz_clear"] = ros::names::resolve("pcl_xyzrgb_concat_rviz_clear");
         remappings["start"] = ros::names::resolve("pcl_xyzrgb_concat_start");
         remappings["stop"] = ros::names::resolve("pcl_xyzrgb_concat_stop");
         remappings["save"] = ros::names::resolve("pcl_xyzrgb_concat_save");
-        remappings["clear"] = ros::names::resolve("pcl_xyzrgb_concat_clear");
         nodelet.load(ros::this_node::getName() + "_xyzrgb_concat", "slamdunk_nodelets/PclXYZRGBConcatNodelet", remappings, nargv);
     }
 
@@ -1292,6 +1581,7 @@ int main(int ac, char** av)
         cbs.ultrasoundCallback = std::bind(&Context::ultrasoundPublish, &context, std::placeholders::_1);
         cbs.barometerCallback = std::bind(&Context::barometerPublish, &context, std::placeholders::_1);
         cbs.magnetometerCallback = std::bind(&Context::magnetometerPublish, &context, std::placeholders::_1);
+        cbs.processingImageInfoCallback = std::bind(&Context::processingImageInfoPublish, &context, std::placeholders::_1);
 
         cbs.period = 30;
         cbs.periodicCallback = std::bind(&Context::tick, &context);

@@ -51,6 +51,8 @@ void PclXYZRGBConcatNodelet::onInit()
 
     m_clearService = m_privateNh.advertiseService<ClearService::Request, ClearService::Response>("clear",
                                                  boost::bind(&PclXYZRGBConcatNodelet::clearServiceCb, this, _1, _2));
+    m_rvizClearService = m_privateNh.advertiseService<RvizClearService::Request, RvizClearService::Response>("rviz_clear",
+                                                 boost::bind(&PclXYZRGBConcatNodelet::rvizClearServiceCb, this, _1, _2));
     m_startService = m_privateNh.advertiseService<StartService::Request, StartService::Response>("start",
                                                  boost::bind(&PclXYZRGBConcatNodelet::startServiceCb, this, _1, _2));
     m_stopService = m_privateNh.advertiseService<StopService::Request, StopService::Response>("stop",
@@ -62,7 +64,26 @@ void PclXYZRGBConcatNodelet::onInit()
 bool PclXYZRGBConcatNodelet::clearServiceCb(ClearService::Request& req, ClearService::Response& resp)
 {
     NODELET_INFO("Clear PCL XYZRGB concat");
-    m_pointCloud = {};
+    m_pointCloud.reset();
+    publish(ros::Time::now());
+    return true;
+}
+
+bool PclXYZRGBConcatNodelet::rvizClearServiceCb(RvizClearService::Request& req, RvizClearService::Response& resp)
+{
+    NODELET_INFO("Clear rviz PCL XYZRGB concat");
+
+    if (!m_emptyPointCloud)
+    {
+        m_emptyPointCloud.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
+        pcl::PointXYZRGB point;
+        point.x = 999999.0f;
+        point.y = 999999.0f;
+        point.z = 999999.0f;
+        m_emptyPointCloud->push_back(point);
+    }
+
+    publish(ros::Time::now(), *m_emptyPointCloud);
     return true;
 }
 
@@ -159,13 +180,13 @@ void PclXYZRGBConcatNodelet::cloudCallback(sensor_msgs::PointCloud2ConstPtr cons
 
 void PclXYZRGBConcatNodelet::insertScan(const tf::Point& sensorOrigin, pcl::PointCloud<pcl::PointXYZRGB> const& pc)
 {
-    if (!m_pointCloud)
+    if (!m_pointCloud || m_pointCloud == m_emptyPointCloud)
         m_pointCloud.reset(new pcl::PointCloud<pcl::PointXYZRGB>());
 
     for (auto it = pc.begin(), ite = pc.end(); it != ite; ++it)
     {
         pcl::PointXYZRGB const& point = *it;
-        if (std::isnormal(point.x))
+        if (std::isfinite(point.x))
         {
             m_pointCloud->push_back(point);
         }
@@ -197,9 +218,13 @@ void PclXYZRGBConcatNodelet::publish(const ros::Time& stamp)
 {
     if (!m_pointCloud)
         return;
+    publish(stamp, *m_pointCloud);
+}
 
+void PclXYZRGBConcatNodelet::publish(const ros::Time& stamp, const pcl::PointCloud<pcl::PointXYZRGB>& pointCloud)
+{
     sensor_msgs::PointCloud2Ptr pc(new sensor_msgs::PointCloud2());
-    pcl::toROSMsg(*m_pointCloud, *pc);
+    pcl::toROSMsg(pointCloud, *pc);
     pc->header.frame_id = "map";
     pc->header.stamp = stamp;
     m_pointCloudPublisher.publish(pc);

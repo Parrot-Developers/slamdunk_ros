@@ -26,57 +26,53 @@
  *
  */
 
-#ifndef SLAMDUNK_PANEL_HPP
-#define SLAMDUNK_PANEL_HPP
+#include "ARSDKPanel.hpp"
 
-#ifndef Q_MOC_RUN
-#include <nodelet/loader.h>
-#include <ros/ros.h>
-#include <rviz/panel.h>
-#endif
+#include <QHeaderView>
+#include <QStandardItemModel>
+#include <QString>
+#include <QTreeView>
+#include <QVBoxLayout>
 
-class QPushButton;
-class QLabel;
-class QStandardItemModel;
-class QStandardItem;
-
-namespace slamdunk_visualization
+namespace slamdunk_bebop_visualization
 {
-class SLAMDunkPanel : public rviz::Panel
+ARSDKPanel::ARSDKPanel(QWidget *parent) : rviz::Panel(parent)
 {
-    Q_OBJECT
-  public:
-    SLAMDunkPanel(QWidget *parent = 0);
+    m_batteryStateChangedSub =
+        m_node.subscribe("/BebopNodelet/batteryStateChanged", 1, &ARSDKPanel::batteryStateChangedCallback, this);
 
-  private Q_SLOTS:
-    void restartSLAM();
-    void restartCapture();
-    void pclXyzrgbConcatClear();
-    void startStreaming();
-    void stopStreaming();
-    void restartStreaming();
-    void startStreamingReception();
-    void stopStreamingReception();
+    createGUI();
+}
 
-  private:
-    void callEmptyService(const std::string &serviceName);
-    void createGUI();
+void ARSDKPanel::createGUI()
+{
+    this->setMinimumHeight(100);
+    QVBoxLayout *layout = new QVBoxLayout;
 
-  private:
-    ros::NodeHandle m_node;
-    nodelet::Loader m_nodeletLoader;
+    m_treeInfo = new QTreeView();
+    m_model = new QStandardItemModel(0, 2);
 
-  protected:
-    QPushButton *m_buttonRestartSLAM = nullptr;
-    QPushButton *m_buttonRestartCapture = nullptr;
-    QPushButton *m_buttonPclXyzrgbConcatClear = nullptr;
-    QPushButton *m_buttonStartStreaming = nullptr;
-    QPushButton *m_buttonStopStreaming = nullptr;
-    QPushButton *m_buttonRestartStreaming = nullptr;
-    QPushButton *m_buttonStartStreamingReception = nullptr;
-    QPushButton *m_buttonStopStreamingReception = nullptr;
-};
+    m_itemBatteryState = new QStandardItem("Battery state");
+    m_itemBatteryState->setEditable(false);
+    m_batteryStateValue = new QStandardItem("Unknown");
+    m_batteryStateValue->setEditable(false);
+    m_model->appendRow(QList<QStandardItem *>() << m_itemBatteryState << m_batteryStateValue);
 
-} // end namespace slamdunk_visualization
+    m_treeInfo->header()->hide();
+    m_treeInfo->setModel(m_model);
+    m_treeInfo->resizeColumnToContents(0);
 
-#endif  // SLAMDUNK_PANEL_HPP
+    layout->addWidget(m_treeInfo);
+
+    setLayout(layout);
+}
+
+void ARSDKPanel::batteryStateChangedCallback(const std_msgs::Float32ConstPtr &msg)
+{
+    m_batteryStateValue->setText(QString::number(msg->data) + " %");
+}
+
+}  // end namespace slamdunk_bebop_visualization
+
+#include <pluginlib/class_list_macros.h>
+PLUGINLIB_EXPORT_CLASS(slamdunk_bebop_visualization::ARSDKPanel, rviz::Panel)

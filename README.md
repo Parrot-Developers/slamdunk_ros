@@ -1,18 +1,7 @@
 # Parrot S.L.A.M.dunk ROS Integration
 
-Get familiar with ROS: http://wiki.ros.org/indigo/Installation/Ubuntu
-
-Parrot S.L.A.M.dunk uses the ROS distribution: indigo
-
-## Viewing with rqt and rviz
-
-A perspective that plot the gyrometers and accelerometers in rqt:
-
-    rqt --perspective-file slamdunk_visualization/rqt/slamdunk.perspective
-
-To plot depth and SLAM pose with rviz:
-
-    rviz -d slamdunk_visualization/rviz/slamdunk.rviz
+* ROS version: Indigo
+* Documentation: http://developer.parrot.com/docs/slamdunk/
 
 ## How to build the node yourself?
 
@@ -33,16 +22,43 @@ To plot depth and SLAM pose with rviz:
 
 ### Get slamdunk packages sources
 
-    cd ~/slamdunk_catkin_ws/src
-    git clone https://github.com/Parrot-Developers/slamdunk_ros.git
+    git clone https://github.com/Parrot-Developers/slamdunk_ros.git src/slamdunk_ros
+    git clone https://github.com/Parrot-Developers/gscam.git src/gscam
+
+### Disable slamdunk_node unless you build on Parrot S.L.A.M.dunk
+
+The `slamdunk_node` and `slamdunk_bebop_robot` depends on `kalamos-context`,
+which is a S.L.A.M.dunk-specific library.
+To build the `slamdunk_ros` package outside of the Parrot S.L.A.M.dunk,
+they need to be disabled.
+
+    touch src/slamdunk_ros/slamdunk_node/CATKIN_IGNORE
+    touch src/slamdunk_ros/slamdunk_bebop_robot/CATKIN_IGNORE
 
 ### Install
 
-    cd ~/slamdunk_catkin_ws
     sudo rosdep init
     rosdep update
     rosdep install --from-paths src --ignore-src -y
     catkin_make -j2
+
+
+## Viewing with rqt and rviz
+
+If you are not on the Parrot S.L.A.M.dunk itself,
+configure you environment, e.g:
+
+    export ROS_MASTER_URI="http://192.168.45.1:11311"
+    export ROS_HOSTNAME=$(hostname).local
+
+A perspective that plot the gyrometers and accelerometers in rqt:
+
+    rqt --perspective-file $(rospack find slamdunk_visualization)/rqt/slamdunk.perspective
+
+To visualize cameras, depthmap, SLAM pose and much more, use rviz:
+
+    rviz -d $(rospack find slamdunk_visualization)/rviz/slamdunk.rviz
+
 
 ## Troubleshooting
 

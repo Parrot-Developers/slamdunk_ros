@@ -26,57 +26,24 @@
  *
  */
 
-#ifndef SLAMDUNK_PANEL_HPP
-#define SLAMDUNK_PANEL_HPP
-
-#ifndef Q_MOC_RUN
 #include <nodelet/loader.h>
 #include <ros/ros.h>
-#include <rviz/panel.h>
-#endif
 
-class QPushButton;
-class QLabel;
-class QStandardItemModel;
-class QStandardItem;
-
-namespace slamdunk_visualization
+int main(int ac, char** av)
 {
-class SLAMDunkPanel : public rviz::Panel
-{
-    Q_OBJECT
-  public:
-    SLAMDunkPanel(QWidget *parent = 0);
+    ros::init(ac, av, "bebop_node");
 
-  private Q_SLOTS:
-    void restartSLAM();
-    void restartCapture();
-    void pclXyzrgbConcatClear();
-    void startStreaming();
-    void stopStreaming();
-    void restartStreaming();
-    void startStreamingReception();
-    void stopStreamingReception();
+    ros::NodeHandle n;
 
-  private:
-    void callEmptyService(const std::string &serviceName);
-    void createGUI();
+    nodelet::Loader nodelet(n);
 
-  private:
-    ros::NodeHandle m_node;
-    nodelet::Loader m_nodeletLoader;
+    {
+        nodelet::M_string remappings(ros::names::getRemappings());
+        nodelet::V_string nargv;
 
-  protected:
-    QPushButton *m_buttonRestartSLAM = nullptr;
-    QPushButton *m_buttonRestartCapture = nullptr;
-    QPushButton *m_buttonPclXyzrgbConcatClear = nullptr;
-    QPushButton *m_buttonStartStreaming = nullptr;
-    QPushButton *m_buttonStopStreaming = nullptr;
-    QPushButton *m_buttonRestartStreaming = nullptr;
-    QPushButton *m_buttonStartStreamingReception = nullptr;
-    QPushButton *m_buttonStopStreamingReception = nullptr;
-};
+        nodelet.load(ros::this_node::getName(), "slamdunk_bebop_robot/BebopNodelet", remappings, nargv);
+    }
 
-} // end namespace slamdunk_visualization
-
-#endif  // SLAMDUNK_PANEL_HPP
+    ros::spin();
+    return 0;
+}

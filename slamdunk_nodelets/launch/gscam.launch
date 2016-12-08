@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<launch>
+
+  <node pkg="gscam" type="gscam" name="cam0_gscam_node" output="screen">
+    <param name="gscam_config" value="udpsrc port=5000 caps=application/x-rtp ! rtph264depay ! avdec_h264 ! video/x-raw,format=I420 ! videoconvert" />
+    <param name="frame_id" value="cam0" />
+    <param name="sync_sink" value="0" />
+    <param name="frame_id" value="cam0" />
+    <remap from="camera/image_raw" to="cam0/gscam_node/image_raw" />
+    <remap from="camera/camera_info" to="cam0/gscam_node/camera_info" />
+    <remap from="camera/set_camera_info" to="cam0/gscam_node/set_camera_info" />
+  </node>
+
+  <node pkg="gscam" type="gscam" name="cam1_gscam_node" output="screen">
+    <param name="gscam_config" value="udpsrc port=5100 caps=application/x-rtp ! rtph264depay ! avdec_h264 ! video/x-raw,format=I420 ! videoconvert" />
+    <param name="frame_id" value="cam1" />
+    <param name="sync_sink" value="0" />
+    <param name="frame_id" value="cam1" />
+    <remap from="camera/image_raw" to="cam1/gscam_node/image_raw" />
+    <remap from="camera/camera_info" to="cam1/gscam_node/camera_info" />
+    <remap from="camera/set_camera_info" to="cam1/gscam_node/set_camera_info" />
+  </node>
+
+</launch>

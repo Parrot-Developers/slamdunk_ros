@@ -26,57 +26,51 @@
  *
  */
 
-#ifndef SLAMDUNK_PANEL_HPP
-#define SLAMDUNK_PANEL_HPP
+#ifndef SLAMDUNK_POSEDISPLAY_HPP
+#define SLAMDUNK_POSEDISPLAY_HPP
 
 #ifndef Q_MOC_RUN
-#include <nodelet/loader.h>
+#include <geometry_msgs/PoseStamped.h>
 #include <ros/ros.h>
-#include <rviz/panel.h>
+#include <rviz/message_filter_display.h>
 #endif
 
-class QPushButton;
 class QLabel;
+class QTreeView;
 class QStandardItemModel;
 class QStandardItem;
 
 namespace slamdunk_visualization
 {
-class SLAMDunkPanel : public rviz::Panel
+class SLAMDunkPoseDisplay : public rviz::MessageFilterDisplay<geometry_msgs::PoseStamped>
 {
     Q_OBJECT
   public:
-    SLAMDunkPanel(QWidget *parent = 0);
+    SLAMDunkPoseDisplay();
+    virtual ~SLAMDunkPoseDisplay();
 
-  private Q_SLOTS:
-    void restartSLAM();
-    void restartCapture();
-    void pclXyzrgbConcatClear();
-    void startStreaming();
-    void stopStreaming();
-    void restartStreaming();
-    void startStreamingReception();
-    void stopStreamingReception();
-
-  private:
-    void callEmptyService(const std::string &serviceName);
-    void createGUI();
-
-  private:
-    ros::NodeHandle m_node;
-    nodelet::Loader m_nodeletLoader;
+    virtual void onInitialize();
+    virtual void onDisable();
+    virtual void onEnable();
 
   protected:
-    QPushButton *m_buttonRestartSLAM = nullptr;
-    QPushButton *m_buttonRestartCapture = nullptr;
-    QPushButton *m_buttonPclXyzrgbConcatClear = nullptr;
-    QPushButton *m_buttonStartStreaming = nullptr;
-    QPushButton *m_buttonStopStreaming = nullptr;
-    QPushButton *m_buttonRestartStreaming = nullptr;
-    QPushButton *m_buttonStartStreamingReception = nullptr;
-    QPushButton *m_buttonStopStreamingReception = nullptr;
-};
+    virtual void processMessage(const geometry_msgs::PoseStampedConstPtr &msg);
+    void clear();
 
+  protected:
+    QTreeView *m_treeInfo = nullptr;
+    QStandardItemModel *m_model = nullptr;
+
+    QStandardItem *m_allPositionValues = nullptr;
+    QStandardItem *m_valuePositionX = nullptr;
+    QStandardItem *m_valuePositionY = nullptr;
+    QStandardItem *m_valuePositionZ = nullptr;
+
+    QStandardItem *m_allOrientationValues = nullptr;
+    QStandardItem *m_valueOrientationYaw = nullptr;
+    QStandardItem *m_valueOrientationPitch = nullptr;
+    QStandardItem *m_valueOrientationRoll = nullptr;
+};
 } // end namespace slamdunk_visualization
 
-#endif  // SLAMDUNK_PANEL_HPP
+#endif  // SLAMDUNK_POSEDISPLAY_HPP
