@@ -20,6 +20,9 @@
   <build_depend>sensor_msgs</build_depend>
   <build_depend>slamdunk_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
+  <build_depend>tf2</build_depend>
+  <build_depend>tf2_geometry_msgs</build_depend>
+  <build_depend>tf2_ros</build_depend>
 
   <run_depend>cv_bridge</run_depend>
   <run_depend>depth_image_proc</run_depend>
@@ -33,5 +36,7 @@
   <run_depend>slamdunk_msgs</run_depend>
   <run_depend>slamdunk_nodelets</run_depend>
   <run_depend>std_msgs</run_depend>
-
+  <run_depend>tf2</run_depend>
+  <run_depend>tf2_geometry_msgs</run_depend>
+  <run_depend>tf2_ros</run_depend>
 </package>

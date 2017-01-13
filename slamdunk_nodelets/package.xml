@@ -20,7 +20,6 @@
   <build_depend>sensor_msgs</build_depend>
   <build_depend>slamdunk_msgs</build_depend>
   <build_depend>std_msgs</build_depend>
-  <build_depend>tf2_ros</build_depend>
 
   <run_depend>image_transport</run_depend>
   <run_depend>nodelet</run_depend>
@@ -29,6 +28,4 @@
   <run_depend>sensor_msgs</run_depend>
   <run_depend>slamdunk_msgs</run_depend>
   <run_depend>std_msgs</run_depend>
-  <run_depend>tf2_ros</run_depend>
-
 </package>

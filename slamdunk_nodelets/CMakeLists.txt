@@ -9,7 +9,6 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   slamdunk_msgs
   std_msgs
-  tf2_ros
 )
 
 catkin_package(CATKIN_DEPENDS roscpp)

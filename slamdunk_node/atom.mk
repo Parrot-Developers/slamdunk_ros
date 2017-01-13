@@ -26,4 +26,10 @@ endif
 LOCAL_COPY_FILES := \
 	../README.md:opt/ros-slamdunk/share/slamdunk_node/
 
+LOCAL_EXTRA_DEPENDENCIES := \
+	cfg/SLAMDunkNode.cfg \
+	src/cvutils.cpp \
+	src/cvutils.hpp \
+	src/main.cpp
+
 include $(BUILD_CMAKE)

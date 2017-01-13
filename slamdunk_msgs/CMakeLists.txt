@@ -13,6 +13,8 @@ add_message_files(
   Quality.msg
   QualityStamped.msg
   ReconfigureLevels.msg
+  ServiceTrigger.msg
+  StreamingTypes.msg
   VideoModes.msg
   VideoSources.msg
 )

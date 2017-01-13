@@ -21,4 +21,12 @@ ifeq ("$(TARGET_CPU)", "tegrak1")
 LOCAL_CMAKE_CONFIGURE_ARGS += -DCMAKE_INSTALL_PREFIX=/opt/ros-slamdunk/
 endif
 
+LOCAL_EXTRA_DEPENDENCIES := \
+	launch/bebop_config.launch \
+	launch/bebop_default.launch \
+	launch/bebop_nodelet.launch \
+	src/bebop_node.cpp \
+	src/bebop_nodelet.hpp \
+	src/bebop_nodelet.cpp
+
 include $(BUILD_CMAKE)

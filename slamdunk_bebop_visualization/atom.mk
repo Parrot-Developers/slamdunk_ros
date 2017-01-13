@@ -20,4 +20,8 @@ ifeq ("$(TARGET_CPU)", "tegrak1")
 LOCAL_CMAKE_CONFIGURE_ARGS += -DCMAKE_INSTALL_PREFIX=/opt/ros-slamdunk/
 endif
 
+LOCAL_EXTRA_DEPENDENCIES := \
+	src/ARSDKPanel.cpp \
+	src/ARSDKPanel.hpp
+
 include $(BUILD_CMAKE)

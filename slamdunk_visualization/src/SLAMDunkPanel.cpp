@@ -28,12 +28,32 @@
 
 #include "SLAMDunkPanel.hpp"
 
+#include <dynamic_reconfigure/Config.h>
+#include <dynamic_reconfigure/IntParameter.h>
+#include <dynamic_reconfigure/Reconfigure.h>
+#include <slamdunk_msgs/ServiceTrigger.h>
 #include <std_srvs/Empty.h>
 #include <QHeaderView>
 #include <QLabel>
 #include <QPushButton>
 #include <QString>
 #include <QVBoxLayout>
+
+namespace
+{
+void setServiceTrigger(const std::string &service, int trigger)
+{
+    dynamic_reconfigure::ReconfigureRequest request;
+
+    dynamic_reconfigure::IntParameter param;
+    param.name = service;
+    param.value = trigger;
+    request.config.ints.push_back(param);
+
+    dynamic_reconfigure::ReconfigureResponse response;
+    ros::service::call("/slamdunk_node/set_parameters", request, response);
+}
+}  // unnamed namespace
 
 namespace slamdunk_visualization
 {
@@ -69,12 +89,12 @@ void SLAMDunkPanel::pclXyzrgbConcatClear()
 
 void SLAMDunkPanel::startStreaming()
 {
-    callEmptyService("start_streaming");
+    setServiceTrigger("service_trigger_streaming", slamdunk_msgs::ServiceTrigger::ALWAYS);
 }
 
 void SLAMDunkPanel::stopStreaming()
 {
-    callEmptyService("stop_streaming");
+    setServiceTrigger("service_trigger_streaming", slamdunk_msgs::ServiceTrigger::ON_DEMAND);
 }
 
 void SLAMDunkPanel::restartStreaming()

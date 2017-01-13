@@ -21,4 +21,17 @@ ifeq ("$(TARGET_CPU)", "tegrak1")
 LOCAL_CMAKE_CONFIGURE_ARGS += -DCMAKE_INSTALL_PREFIX=/opt/ros-slamdunk/
 endif
 
+LOCAL_EXTRA_DEPENDENCIES := \
+	src/pcl_xyzrgb_concat_node.cpp \
+	src/pcl_xyzrgb_concat_nodelet.cpp \
+	src/pcl_xyzrgb_record_nodelet.cpp \
+	src/keyframe_publisher_nodelet.hpp \
+	src/pcl_xyzrgb_record_nodelet.hpp \
+	src/pose_to_path_nodelet.cpp \
+	src/keyframe_publisher_nodelet.cpp \
+	src/goodframe_publisher_nodelet.hpp \
+	src/goodframe_publisher_nodelet.cpp \
+	src/pose_to_path_nodelet.hpp \
+	src/pcl_xyzrgb_concat_nodelet.hpp
+
 include $(BUILD_CMAKE)

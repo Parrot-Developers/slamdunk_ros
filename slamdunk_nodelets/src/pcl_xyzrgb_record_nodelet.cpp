@@ -28,6 +28,7 @@
 
 #include "pcl_xyzrgb_record_nodelet.hpp"
 
+#include <boost/system/system_error.hpp>
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl_ros/transforms.h>
 #include <sensor_msgs/PointCloud2.h>
@@ -52,11 +53,29 @@ bool PclXYZRGBRecordNodelet::startServiceCb(StartService::Request& req, StartSer
     if (m_pointCloudSubscriber)
         return false;
 
-    if (!req.allowOverride && boost::filesystem::exists(req.path))
-        return false;
+    boost::system::error_code ec;
+    for (boost::filesystem::directory_iterator it(req.path, ec); it != boost::filesystem::directory_iterator(); ++it)
+    {
+        if (it->path().extension() == ".pcd")
+        {
+            if (req.allowOverride)
+            {
+                boost::filesystem::remove_all(it->path());
+            }
+            else
+            {
+                NODELET_INFO("This directory already contains .pcd files");
+                return false;
+            }
+        }
+    }
 
-    if (!boost::filesystem::create_directories(req.path))
+    boost::filesystem::create_directories(req.path, ec);
+    if (ec)
+    {
+        NODELET_INFO("Could not create directory");
         return false;
+    }
 
     m_path = req.path;
     m_pointCloudSubscriber.reset(new message_filters::Subscriber<sensor_msgs::PointCloud2>(m_nh, "pcl_xyzrgb_in", 10));
@@ -98,6 +117,8 @@ void PclXYZRGBRecordNodelet::cloudCallback(sensor_msgs::PointCloud2ConstPtr cons
     std::string path = (boost::format("%s/%04i.pcd") % m_path % (m_currentNumber++)).str();
     pcl::io::savePCDFile(path, *pclMessage, sensorToWorldMatrix.rightCols<1>(),
                          Eigen::Quaternionf(sensorToWorldMatrix.block<3, 3>(0, 0)), true);
+    boost::filesystem::permissions(path, boost::filesystem::perms::add_perms | boost::filesystem::perms::group_read |
+                                             boost::filesystem::perms::others_read);
 }
 }
 

@@ -29,6 +29,7 @@
 #include <endian.h>
 #include <time.h>
 
+#include <bitset>
 #include <chrono>
 #include <cinttypes>
 #include <memory>
@@ -46,32 +47,36 @@
 #include <image_transport/image_transport.h>
 #include <interactive_markers/interactive_marker_server.h>
 #include <interactive_markers/menu_handler.h>
-#include <slamdunk_msgs/BoolStamped.h>
-#include <slamdunk_msgs/QualityStamped.h>
-#include <slamdunk_msgs/ReconfigureLevels.h>
-#include <slamdunk_msgs/VideoModes.h>
-#include <slamdunk_msgs/VideoSources.h>
-#include <slamdunk_node/SLAMDunkNodeConfig.h>
-#include <octomap/OcTree.h>
-#include <octomap_msgs/conversions.h>
 #include <nodelet/loader.h>
+#include <octomap/OcTree.h>
 #include <octomap_msgs/Octomap.h>
-#include <sensor_msgs/distortion_models.h>
-#include <sensor_msgs/FluidPressure.h>
+#include <octomap_msgs/conversions.h>
 #include <ros/ros.h>
+#include <sensor_msgs/FluidPressure.h>
 #include <sensor_msgs/Imu.h>
 #include <sensor_msgs/MagneticField.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <sensor_msgs/Range.h>
+#include <sensor_msgs/distortion_models.h>
 #include <sensor_msgs/distortion_models.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
-#include <sensor_msgs/Range.h>
-#include <stereo_msgs/DisparityImage.h>
+#include <slamdunk_msgs/BoolStamped.h>
+#include <slamdunk_msgs/QualityStamped.h>
+#include <slamdunk_msgs/ReconfigureLevels.h>
+#include <slamdunk_msgs/ServiceTrigger.h>
+#include <slamdunk_msgs/StreamingTypes.h>
+#include <slamdunk_msgs/VideoModes.h>
+#include <slamdunk_msgs/VideoSources.h>
+#include <slamdunk_node/SLAMDunkNodeConfig.h>
 #include <std_msgs/Bool.h>
-#include <std_msgs/String.h>
 #include <std_msgs/Float32.h>
+#include <std_msgs/String.h>
 #include <std_srvs/Empty.h>
-#include <tf2_ros/transform_broadcaster.h>
+#include <stereo_msgs/DisparityImage.h>
+#include <tf2/convert.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2/LinearMath/Quaternion.h>
+#include <tf2_ros/transform_broadcaster.h>
 
 namespace
 {
@@ -119,9 +124,7 @@ namespace
             m_restartCaptureService = n.advertiseService("restart_capture", &Context::restartCaptureServiceCb, this);
             m_restartSlamService = n.advertiseService("restart_slam", &Context::restartSlamServiceCb, this);
             m_restartOccupancyService = n.advertiseService("restart_occupancy", &Context::restartOccupancyServiceCb, this);
-            m_startStreamingService = n.advertiseService("start_streaming", &Context::startStreamingServiceCb, this);
             m_restartStreamingService = n.advertiseService("restart_streaming", &Context::restartStreamingServiceCb, this);
-            m_stopStreamingService = n.advertiseService("stop_streaming", &Context::stopStreamingServiceCb, this);
 
             m_dynamicReconfigureServer.setCallback(boost::bind(&Context::dynamicReconfigureCb, this, _1, _2));
 
@@ -131,6 +134,7 @@ namespace
         void setKalamosContext(kalamos::Context* c);
         void tick();
         void handleSensorsActivation();
+        void publishStaticTfs();
 
         void depthmapPublish(kalamos::DepthmapData const& dm);
         void dispmapPublish(kalamos::DispmapData const& dm);
@@ -161,32 +165,28 @@ namespace
         /// Convert kalamos timestamp to ROS time
         ros::Time convertStamp(std::uint64_t kstamp) const;
 
+        /// Mark a service as dirty, if the service is running, it will be restart on the next tick().
+        void setDirty(kalamos::ServiceType service);
+        bool isDirty(kalamos::ServiceType service) const;
+
     private:
         bool restartCapture();
         bool restartSlam();
         bool restartOccupancy();
-        bool startStreaming();
         bool restartStreaming();
-        bool stopStreaming();
         // Services
         typedef std_srvs::Empty RestartCaptureSrv;
         typedef std_srvs::Empty RestartSlamSrv;
         typedef std_srvs::Empty RestartOccupancySrv;
-        typedef std_srvs::Empty StartStreamingSrv;
         typedef std_srvs::Empty RestartStreamingSrv;
-        typedef std_srvs::Empty StopStreamingSrv;
         bool restartCaptureServiceCb(RestartCaptureSrv::Request& req, RestartCaptureSrv::Response& resp);
         bool restartSlamServiceCb(RestartSlamSrv::Request& req, RestartSlamSrv::Response& resp);
         bool restartOccupancyServiceCb(RestartOccupancySrv::Request& req, RestartOccupancySrv::Response& resp);
-        bool startStreamingServiceCb(StartStreamingSrv::Request& req, StartStreamingSrv::Response& resp);
         bool restartStreamingServiceCb(RestartStreamingSrv::Request& req, RestartStreamingSrv::Response& resp);
-        bool stopStreamingServiceCb(StopStreamingSrv::Request& req, StopStreamingSrv::Response& resp);
         ros::ServiceServer m_restartCaptureService;
         ros::ServiceServer m_restartSlamService;
         ros::ServiceServer m_restartOccupancyService;
-        ros::ServiceServer m_startStreamingService;
         ros::ServiceServer m_restartStreamingService;
-        ros::ServiceServer m_stopStreamingService;
 
     private:
         ros::NodeHandle& m_rosNode;
@@ -202,6 +202,12 @@ namespace
         std::unique_ptr<kalamos::ServiceHandle> m_slamHandle;
         std::unique_ptr<kalamos::ServiceHandle> m_occupancyHandle;
         std::unique_ptr<kalamos::ServiceHandle> m_streamingHandle;
+
+        tf2::Quaternion m_gravityQuat;
+        bool m_renewGravityQuat = true;
+
+        /// bitset of services that needs to be restarted (e.g. after a configuration change)
+        std::bitset<static_cast<int>(kalamos::ServiceType::SERVICE_TYPE_LAST) + 1> m_dirtyServices;
 
         image_transport::CameraPublisher m_depthmapPublisher;
         image_transport::CameraPublisher m_dispmapPublisher;
@@ -249,15 +255,11 @@ namespace
         interactive_markers::MenuHandler::EntryHandle m_menuRestartCaptureHandle;
         interactive_markers::MenuHandler::EntryHandle m_menuRestartSlamHandle;
         interactive_markers::MenuHandler::EntryHandle m_menuRestartOccupancyHandle;
-        interactive_markers::MenuHandler::EntryHandle m_menuStartStreamingHandle;
         interactive_markers::MenuHandler::EntryHandle m_menuRestartStreamingHandle;
-        interactive_markers::MenuHandler::EntryHandle m_menuStopStreamingHandle;
         void menuRestartCaptureCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
         void menuRestartSlamCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
         void menuRestartOccupancyCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
-        void menuStartStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
         void menuRestartStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
-        void menuStopStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback);
         bool m_withBarometer = false;
         bool m_withMagnetometer = false;
         bool m_withUltrasound = false;
@@ -300,10 +302,23 @@ namespace
         options.cropHeight = m_config.streaming_crop_height;
         options.rescaleWidth = m_config.streaming_rescale_width;
         options.rescaleHeight = m_config.streaming_rescale_height;
-        options.host = m_config.streaming_host;
-        options.portLeft = m_config.streaming_port_left;
-        options.portRight = m_config.streaming_port_right;
         options.bitrate = m_config.streaming_bitrate;
+        switch (m_config.streaming_type)
+        {
+            default:
+            case slamdunk_msgs::StreamingTypes::TYPE_RTP:
+                options.type = kalamos::StreamingType::TYPE_RTP;
+                break;
+            case slamdunk_msgs::StreamingTypes::TYPE_FILE:
+                options.type = kalamos::StreamingType::TYPE_FILE;
+                break;
+        }
+        options.rtpHost = m_config.streaming_rtp_host;
+        options.rtpPortLeft = m_config.streaming_rtp_port_left;
+        options.rtpPortRight = m_config.streaming_rtp_port_right;
+        options.filePath = m_config.streaming_file_path;
+        options.fileEnableLeft = m_config.streaming_file_enable_left;
+        options.fileEnableRight = m_config.streaming_file_enable_right;
         m_kalamosContext->setStreamingOptions(options);
     }
 
@@ -620,124 +635,65 @@ namespace
 
     void Context::posePublish(kalamos::PoseData const& poseData)
     {
-        geometry_msgs::PoseStampedPtr pose(new geometry_msgs::PoseStamped());
-
-        // frame is the map name
-        pose->header.frame_id = "map";
-        pose->header.stamp = convertStamp(poseData.ts);
-
-        pose->pose.position.x = poseData.translation[0];
-        pose->pose.position.y = poseData.translation[1];
-        pose->pose.position.z = poseData.translation[2];
-        pose->pose.orientation.w = poseData.quaternion[0];
-        pose->pose.orientation.x = poseData.quaternion[1];
-        pose->pose.orientation.y = poseData.quaternion[2];
-        pose->pose.orientation.z = poseData.quaternion[3];
-
-        m_posePublisher.publish(pose);
-
+        if (m_renewGravityQuat)
         {
-            geometry_msgs::TransformStamped transform;
-            transform.header = pose->header;
-            transform.header.frame_id = "map";
-            transform.child_frame_id = "cam0";
-            transform.transform.translation.x = pose->pose.position.x;
-            transform.transform.translation.y = pose->pose.position.y;
-            transform.transform.translation.z = pose->pose.position.z;
-            transform.transform.rotation = pose->pose.orientation;
-            m_transformBroadcaster.sendTransform(transform);
-        }
-        {
-            geometry_msgs::TransformStamped transform;
-            transform.header = pose->header;
-            transform.header.frame_id = "cam0";
-            transform.child_frame_id = "cam1";
-            transform.transform.translation.x = 0;
-            transform.transform.translation.y = -0.2; // arbitrary 20cm between leftcam and rightcam
-            transform.transform.translation.z = 0;
-            transform.transform.rotation.w = 1;
-            transform.transform.rotation.x = 0;
-            transform.transform.rotation.y = 0;
-            transform.transform.rotation.z = 0;
-            m_transformBroadcaster.sendTransform(transform);
-        }
-        {
-            geometry_msgs::TransformStamped transform;
-            transform.header = pose->header;
-            transform.header.frame_id = "cam0_optical";
-            transform.child_frame_id = "cam0_rect_optical";
-            transform.transform.translation.x = 0;
-            transform.transform.translation.y = 0;
-            transform.transform.translation.z = 0;
-            transform.transform.rotation.w = 1;
-            transform.transform.rotation.x = 0;
-            transform.transform.rotation.y = 0;
-            transform.transform.rotation.z = 0;
-            m_transformBroadcaster.sendTransform(transform);
-        }
-        {
-            geometry_msgs::TransformStamped transform;
-            transform.header = pose->header;
-            transform.header.frame_id = "cam0";
-            transform.child_frame_id = "cam0_optical";
-            transform.transform.translation.x = 0;
-            transform.transform.translation.y = 0;
-            transform.transform.translation.z = 0;
-
-            tf2::Quaternion quat;
-            double yaw = -M_PI / 2.0;
-            double pitch = 0.0;
-            double roll = -M_PI / 2.0;
-            quat.setRPY(roll, pitch, yaw);
-            transform.transform.rotation.x = quat.x();
-            transform.transform.rotation.y = quat.y();
-            transform.transform.rotation.z = quat.z();
-            transform.transform.rotation.w = quat.w();
-
-            m_transformBroadcaster.sendTransform(transform);
-        }
-        {
-            geometry_msgs::TransformStamped transform;
-            transform.header = pose->header;
-            transform.header.frame_id = "cam1";
-            transform.child_frame_id = "cam1_optical";
-            transform.transform.translation.x = 0;
-            transform.transform.translation.y = 0;
-            transform.transform.translation.z = 0;
-            transform.transform.rotation.w = 1;
-            transform.transform.rotation.x = 0;
-            transform.transform.rotation.y = 0;
-            transform.transform.rotation.z = 0;
-            m_transformBroadcaster.sendTransform(transform);
-        }
-        {
-            kalamos::Transform imu2cam(m_kalamosContext->getCam2ImuTransform());
-            geometry_msgs::TransformStamped transform;
-            transform.header = pose->header;
-            transform.header.frame_id = "cam0";
-            transform.child_frame_id = "imu";
-            transform.transform.translation.x = imu2cam.translation[0];
-            transform.transform.translation.y = imu2cam.translation[1];
-            transform.transform.translation.z = imu2cam.translation[2];
-            transform.transform.rotation.w = imu2cam.rotation[0];
-            transform.transform.rotation.x = imu2cam.rotation[1];
-            transform.transform.rotation.y = imu2cam.rotation[2];
-            transform.transform.rotation.z = imu2cam.rotation[3];
-            m_transformBroadcaster.sendTransform(transform);
+            m_renewGravityQuat = false;
+            // The gravity transform is computed once at the start of the SLAM.
+            // In order to have the SLAM pose in a plane somewhat parallel to the ground,
+            // we use the 'up' vector deduced from the accelerometer.
+            tf2::Vector3 up;
+            for (int i = 0; i < 3; ++i)
+            {
+                up[i] = poseData.up[i];
+            }
+            // we want to compensate the angle,
+            // so we use inverse() to reverse the direction of the rotation
+            m_gravityQuat = tf2::shortestArcQuat(tf2::Vector3(0, 0, 1), up).normalized().inverse();
         }
 
+        // The SLAM is a localisation component, it can produce discrete jumps over time.
+        // For this reason we use the 'map' frame_id for the SLAM pose.
+        // c.f. REP 105 (http://www.ros.org/reps/rep-0105.html#map)
+        geometry_msgs::TransformStamped transform;
+        transform.header.stamp = convertStamp(poseData.ts);
+        transform.header.frame_id = "map";
+        transform.child_frame_id = "cam0";
+        transform.transform.translation.x = poseData.translation[0];
+        transform.transform.translation.y = poseData.translation[1];
+        transform.transform.translation.z = poseData.translation[2];
+        tf2::Quaternion quatRot;
+        quatRot.setW(poseData.quaternion[0]);
+        quatRot.setX(poseData.quaternion[1]);
+        quatRot.setY(poseData.quaternion[2]);
+        quatRot.setZ(poseData.quaternion[3]);
+
+        quatRot = m_gravityQuat * quatRot;
+        tf2::convert(quatRot, transform.transform.rotation);
+
+        m_transformBroadcaster.sendTransform(transform);
+
         {
-            slamdunk_msgs::BoolStampedPtr keyframeMsg(new slamdunk_msgs::BoolStamped());
-            keyframeMsg->header = pose->header;
-            keyframeMsg->value = poseData.keyframe;
-            m_keyframePublisher.publish(keyframeMsg);
+            geometry_msgs::PoseStampedPtr pose(new geometry_msgs::PoseStamped());
+            pose->header = transform.header;
+            pose->pose.position.x = transform.transform.translation.x;
+            pose->pose.position.y = transform.transform.translation.y;
+            pose->pose.position.z = transform.transform.translation.z;
+            pose->pose.orientation = transform.transform.rotation;
+            m_posePublisher.publish(pose);
         }
 
         {
             slamdunk_msgs::QualityStampedPtr qualityMsg(new slamdunk_msgs::QualityStamped());
-            qualityMsg->header = pose->header;
+            qualityMsg->header = transform.header;
             qualityMsg->quality.value = (uint8_t)poseData.quality;
             m_qualityPublisher.publish(qualityMsg);
+        }
+
+        {
+            slamdunk_msgs::BoolStampedPtr keyframeMsg(new slamdunk_msgs::BoolStamped());
+            keyframeMsg->header = transform.header;
+            keyframeMsg->value = poseData.keyframe;
+            m_keyframePublisher.publish(keyframeMsg);
         }
     }
 
@@ -933,12 +889,8 @@ namespace
             m_menuHandle.insert("Restart slam", boost::bind(&Context::menuRestartSlamCb, this, _1));
         m_menuRestartOccupancyHandle =
             m_menuHandle.insert("Restart occupancy", boost::bind(&Context::menuRestartOccupancyCb, this, _1));
-        m_menuStartStreamingHandle =
-            m_menuHandle.insert("Start streaming", boost::bind(&Context::menuStartStreamingCb, this, _1));
         m_menuRestartStreamingHandle =
             m_menuHandle.insert("Restart streaming", boost::bind(&Context::menuRestartStreamingCb, this, _1));
-        m_menuStopStreamingHandle =
-            m_menuHandle.insert("Stop streaming", boost::bind(&Context::menuStopStreamingCb, this, _1));
 
         visualization_msgs::InteractiveMarker int_marker;
         int_marker.header.frame_id = "cam0";
@@ -1027,6 +979,7 @@ namespace
         }
         // octomap is going to be invalid, clear it
         m_octomapOctree.clear();
+        m_renewGravityQuat = true;
         return m_captureHandle->restart();
     }
 
@@ -1056,20 +1009,6 @@ namespace
         return m_occupancyHandle->restart();
     }
 
-    bool Context::startStreaming()
-    {
-        ROS_INFO("start streaming requested...");
-        if (m_streamingHandle)
-        {
-            ROS_INFO("... but streaming was started already");
-            return false;
-        }
-        m_streamingHandle = m_kalamosContext->startService(kalamos::ServiceType::STREAMING);
-        if (!m_streamingHandle)
-            ROS_INFO("could not start streaming");
-        return !!m_streamingHandle;
-    }
-
     bool Context::restartStreaming()
     {
         ROS_INFO("restart streaming requested...");
@@ -1087,18 +1026,6 @@ namespace
         return !!m_streamingHandle;
     }
 
-    bool Context::stopStreaming()
-    {
-        ROS_INFO("stop streaming requested...");
-        if (!m_streamingHandle)
-        {
-            ROS_INFO("... but streaming was not started to begin with");
-            return false;
-        }
-        m_streamingHandle.reset();
-        return true;
-    }
-
     bool Context::restartCaptureServiceCb(RestartCaptureSrv::Request& req, RestartCaptureSrv::Response& resp)
     {
         return restartCapture();
@@ -1114,19 +1041,10 @@ namespace
         return restartOccupancy();
     }
 
-    bool Context::startStreamingServiceCb(StartStreamingSrv::Request& req, StartStreamingSrv::Response& resp)
-    {
-        return startStreaming();
-    }
 
     bool Context::restartStreamingServiceCb(RestartStreamingSrv::Request& req, RestartStreamingSrv::Response& resp)
     {
         return restartStreaming();
-    }
-
-    bool Context::stopStreamingServiceCb(StopStreamingSrv::Request& req, StopStreamingSrv::Response& resp)
-    {
-        return stopStreaming();
     }
 
     void Context::menuRestartCaptureCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
@@ -1144,23 +1062,17 @@ namespace
         restartOccupancy();
     }
 
-    void Context::menuStartStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
-    {
-        startStreaming();
-    }
-
     void Context::menuRestartStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
     {
         restartStreaming();
     }
 
-    void Context::menuStopStreamingCb(const visualization_msgs::InteractiveMarkerFeedbackConstPtr &feedback)
-    {
-        stopStreaming();
-    }
-
     void Context::dynamicReconfigureCb(slamdunk_node::SLAMDunkNodeConfig& config, uint32_t level)
     {
+        // NOTE: we deliberately don't handle
+        // (level & slamdunk_msgs::ReconfigureLevels::SERVICE_TRIGGER) here,
+        // the assignment of m_config is sufficient to handle this in the periodic callback
+
         m_config = config;
 
         if (level & slamdunk_msgs::ReconfigureLevels::NODE)
@@ -1171,12 +1083,30 @@ namespace
         // streaming configuration
         if (level & slamdunk_msgs::ReconfigureLevels::STREAMING)
         {
-            ROS_INFO("STREAMING Reconfigure Request:\ncrop: %dx%d, rescale %dx%d\nhost %s, ports: (%d,%d)\nbitrate %d",
-                     config.streaming_crop_width, config.streaming_crop_height, config.streaming_rescale_width,
-                     config.streaming_rescale_height, config.streaming_host.c_str(), config.streaming_port_left,
-                     config.streaming_port_right, config.streaming_bitrate);
+            ROS_INFO("STREAMING Reconfigure Request:");
+            ROS_INFO("crop: %dx%d, rescale %dx%d, bitrate %d", config.streaming_crop_width,
+                     config.streaming_crop_height, config.streaming_rescale_width, config.streaming_rescale_height,
+                     config.streaming_bitrate);
+            switch (config.streaming_type)
+            {
+                default:
+                case slamdunk_msgs::StreamingTypes::TYPE_RTP:
+                    ROS_INFO("Type: RTP, host: %s, ports: (%d, %d)", config.streaming_rtp_host.c_str(),
+                             config.streaming_rtp_port_left, config.streaming_rtp_port_right);
+                    break;
+                case slamdunk_msgs::StreamingTypes::TYPE_FILE:
+                    ROS_INFO("Type: FILE, path: %s, enabled: (%i, %i)", config.streaming_file_path.c_str(),
+                             config.streaming_file_enable_left, config.streaming_file_enable_right);
+                    break;
+            }
+
+            // rqt_reconfigure on kinetic will crash with a "hide" type group.
+            // Uncomment if rqt_reconfigure client runs on indigo or if rqt_reconfigure has been fixed.
+            // config.groups.streaming.rtp.state = (config.streaming_type == slamdunk_msgs::StreamingTypes::TYPE_RTP);
+            // config.groups.streaming.file.state = (config.streaming_type == slamdunk_msgs::StreamingTypes::TYPE_FILE);
 
             forwardStreamingOptions();
+            setDirty(kalamos::ServiceType::STREAMING);
         }
 
         if (level & slamdunk_msgs::ReconfigureLevels::VIDEO_MODE)
@@ -1184,6 +1114,7 @@ namespace
             ROS_INFO("VIDEO_MODE Reconfigure Request");
 
             forwardVideoMode();
+            setDirty(kalamos::ServiceType::CAPTURE);
         }
 
         if (level & slamdunk_msgs::ReconfigureLevels::VIDEO_SOURCE)
@@ -1191,6 +1122,7 @@ namespace
             ROS_INFO("VIDEO_SOURCE Reconfigure Request");
 
             forwardVideoSource();
+            setDirty(kalamos::ServiceType::CAPTURE);
         }
     }
 
@@ -1217,6 +1149,16 @@ namespace
         return ros::Time().fromNSec((std::chrono::nanoseconds(kstamp) + m_kalamosToROSOffset).count());
     }
 
+    void Context::setDirty(kalamos::ServiceType service)
+    {
+        m_dirtyServices.set(static_cast<int>(service));
+    }
+
+    bool Context::isDirty(kalamos::ServiceType service) const
+    {
+        return m_dirtyServices.test(static_cast<int>(service));
+    }
+
     void Context::tick()
     {
         ros::spinOnce();
@@ -1226,38 +1168,116 @@ namespace
             m_kalamosContext->setPeriodicCallback(0, nullptr);
         }
 
+        publishStaticTfs();
+
         bool needOccupancy =
             !!m_occupancyPublisher.getNumSubscribers();
 
         bool needPointCloud =
             !!m_pointCloud2Publisher.getNumSubscribers();
 
-        bool needSlam =
-            needOccupancy ||
-            needPointCloud ||
-            !!m_posePublisher.getNumSubscribers();
-
-        bool needCapture =
-            needSlam ||
-            !!m_depthmapPublisher.getNumSubscribers() ||
-            !!m_dispmapPublisher.getNumSubscribers() ||
-            !!m_stereoPublisher.getNumSubscribers() ||
-            !!m_leftRgbPublisher.getNumSubscribers() ||
-            !!m_leftGrayscalePublisher.getNumSubscribers() ||
-            !!m_leftRgbRectPublisher.getNumSubscribers() ||
-            !!m_rightRgbPublisher.getNumSubscribers() ||
-            !!m_rightGrayscalePublisher.getNumSubscribers() ||
-            !!m_imuPublisher.getNumSubscribers() ||
-            !!m_ultrasoundPublisher.getNumSubscribers() ||
-            !!m_barometerPublisher.getNumSubscribers() ||
-            !!m_magnetometerPublisher.getNumSubscribers() ||
-            !!m_processingImageRatePublisher.getNumSubscribers();
-
-        if (needCapture && !m_captureHandle)
+        bool needSlam = false;
+        switch (m_config.service_trigger_slam)
         {
-            ROS_INFO("start capture");
-            m_captureHandle = m_kalamosContext->startService(kalamos::ServiceType::CAPTURE);
+            case slamdunk_msgs::ServiceTrigger::ALWAYS:
+                needSlam = true;
+                break;
+
+            case slamdunk_msgs::ServiceTrigger::NEVER:
+                needSlam = false;
+                break;
+
+            case slamdunk_msgs::ServiceTrigger::ON_DEMAND:
+                needSlam = needOccupancy || needPointCloud
+                    || !!m_posePublisher.getNumSubscribers()
+                    || !!m_keyframePublisher.getNumSubscribers()
+                    || !!m_qualityPublisher.getNumSubscribers();
+                break;
         }
+
+        bool needStreaming = false;
+        switch (m_config.service_trigger_streaming)
+        {
+            case slamdunk_msgs::ServiceTrigger::ALWAYS:
+                needStreaming = true;
+                break;
+
+            case slamdunk_msgs::ServiceTrigger::NEVER:
+                needStreaming = false;
+                break;
+
+            case slamdunk_msgs::ServiceTrigger::ON_DEMAND:
+                // NOTE: right now no subscribers or services depends on the streaming
+                break;
+        }
+
+        bool needCapture = false;
+        switch (m_config.service_trigger_capture)
+        {
+            case slamdunk_msgs::ServiceTrigger::ALWAYS:
+                needCapture = true;
+                break;
+
+            case slamdunk_msgs::ServiceTrigger::NEVER:
+                needCapture = false;
+                if (needSlam)
+                {
+                    ROS_WARN_THROTTLE(6, "SLAM will not start because capture is disabled");
+                    needSlam = false;
+                }
+                if (needStreaming)
+                {
+                    ROS_WARN_THROTTLE(6, "Streaming will not start because capture is disabled");
+                    needStreaming = false;
+                }
+                break;
+
+            case slamdunk_msgs::ServiceTrigger::ON_DEMAND:
+                needCapture =
+                    needSlam ||
+                    needStreaming ||
+                    !!m_depthmapPublisher.getNumSubscribers() ||
+                    !!m_dispmapPublisher.getNumSubscribers() ||
+                    !!m_stereoPublisher.getNumSubscribers() ||
+                    !!m_leftRgbPublisher.getNumSubscribers() ||
+                    !!m_leftGrayscalePublisher.getNumSubscribers() ||
+                    !!m_leftRgbRectPublisher.getNumSubscribers() ||
+                    !!m_rightRgbPublisher.getNumSubscribers() ||
+                    !!m_rightGrayscalePublisher.getNumSubscribers() ||
+                    !!m_imuPublisher.getNumSubscribers() ||
+                    !!m_ultrasoundPublisher.getNumSubscribers() ||
+                    !!m_barometerPublisher.getNumSubscribers() ||
+                    !!m_magnetometerPublisher.getNumSubscribers() ||
+                    !!m_processingImageRatePublisher.getNumSubscribers();
+                break;
+        }
+
+        if (needCapture)
+        {
+            if (!m_captureHandle)
+            {
+                ROS_INFO("start capture");
+                m_captureHandle = m_kalamosContext->startService(kalamos::ServiceType::CAPTURE);
+            }
+            else if (isDirty(kalamos::ServiceType::CAPTURE))
+            {
+                restartCapture();
+            }
+        }
+
+        if (needStreaming)
+        {
+            if (!m_streamingHandle)
+            {
+                ROS_INFO("start streaming");
+                m_streamingHandle = m_kalamosContext->startService(kalamos::ServiceType::STREAMING);
+            }
+            else if (isDirty(kalamos::ServiceType::STREAMING))
+            {
+                restartStreaming();
+            }
+        }
+
         if (needSlam && !m_slamHandle)
         {
             ROS_INFO("start slam");
@@ -1289,12 +1309,97 @@ namespace
             ROS_INFO("stop slam");
             m_slamHandle.reset();
         }
+        if (!needStreaming && m_streamingHandle)
+        {
+            ROS_INFO("stop streaming");
+            m_streamingHandle.reset();
+        }
         if (!needCapture && m_captureHandle)
         {
             ROS_INFO("stop capture");
             m_captureHandle.reset();
         }
+
         handleSensorsActivation();
+        m_dirtyServices.reset();
+    }
+
+    void Context::publishStaticTfs()
+    {
+        ros::Time rTime = ros::Time::now();
+        std::vector<geometry_msgs::TransformStamped> transforms;
+
+        {
+            geometry_msgs::TransformStamped transform;
+            transform.header.stamp = rTime;
+            transform.header.frame_id = "cam0";
+            transform.child_frame_id = "cam1";
+            transform.transform.translation.x = 0;
+            transform.transform.translation.y = -0.2; // arbitrary 20cm between cameras
+            transform.transform.translation.z = 0;
+            transform.transform.rotation.w = 1;
+            transform.transform.rotation.x = 0;
+            transform.transform.rotation.y = 0;
+            transform.transform.rotation.z = 0;
+            transforms.push_back(transform);
+        }
+
+        {
+            geometry_msgs::TransformStamped transform;
+            transform.header.stamp = rTime;
+            transform.transform.translation.x = 0;
+            transform.transform.translation.y = 0;
+            transform.transform.translation.z = 0;
+            tf2::Quaternion quat;
+            double yaw = -M_PI / 2.0;
+            double pitch = 0.0;
+            double roll = -M_PI / 2.0;
+            quat.setRPY(roll, pitch, yaw);
+            transform.transform.rotation.x = quat.x();
+            transform.transform.rotation.y = quat.y();
+            transform.transform.rotation.z = quat.z();
+            transform.transform.rotation.w = quat.w();
+
+            transform.header.frame_id = "cam0";
+            transform.child_frame_id = "cam0_optical";
+            transforms.push_back(transform);
+            transform.header.frame_id = "cam1";
+            transform.child_frame_id = "cam1_optical";
+            transforms.push_back(transform);
+        }
+
+        {
+            geometry_msgs::TransformStamped transform;
+            transform.header.stamp = rTime;
+            transform.header.frame_id = "cam0_optical";
+            transform.child_frame_id = "cam0_rect_optical";
+            transform.transform.translation.x = 0;
+            transform.transform.translation.y = 0;
+            transform.transform.translation.z = 0;
+            transform.transform.rotation.w = 1;
+            transform.transform.rotation.x = 0;
+            transform.transform.rotation.y = 0;
+            transform.transform.rotation.z = 0;
+            transforms.push_back(transform);
+        }
+
+        {
+            kalamos::Transform imu2cam(m_kalamosContext->getCam2ImuTransform());
+            geometry_msgs::TransformStamped transform;
+            transform.header.stamp = rTime;
+            transform.header.frame_id = "cam0";
+            transform.child_frame_id = "imu";
+            transform.transform.translation.x = imu2cam.translation[0];
+            transform.transform.translation.y = imu2cam.translation[1];
+            transform.transform.translation.z = imu2cam.translation[2];
+            transform.transform.rotation.w = imu2cam.rotation[0];
+            transform.transform.rotation.x = imu2cam.rotation[1];
+            transform.transform.rotation.y = imu2cam.rotation[2];
+            transform.transform.rotation.z = imu2cam.rotation[3];
+            transforms.push_back(transform);
+        }
+
+        m_transformBroadcaster.sendTransform(transforms);
     }
 
     void Context::handleSensorsActivation()

@@ -37,10 +37,10 @@ Usage: $1 [ -h ] [ -c ] [ -g ] [ -u <user> ] [ -d <device> ] -p package_name [ a
   -p: package name
 
 Before to be used, you have to:
-* initialize a ROS workspace on SLAMdunk
+* initialize a ROS workspace on your Parrot S.L.A.M.dunk
 * initialize a ROS workspace on your PC
 
-It's recommended to copy your public SSH key on SLAMdunk.
+It's recommended to copy your public SSH key on the Parrot S.L.A.M.dunk.
 EOF
 }
 
@@ -52,6 +52,14 @@ display_packages()
     [ -d "src/${x}" ] && echo -n " ${x}"
   done
   echo
+}
+
+display_env_help()
+{
+  echo "Remote environment not ready"
+  echo "ssh -t ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} \"sudo apt-get update && sudo apt-get install build-essential git\""
+  echo "ssh ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} \"source /opt/ros/indigo/setup.bash && mkdir -p ~/slamdunk_catkin_ws/src && cd ~/slamdunk_catkin_ws/src && catkin_init_workspace && cd ~/slamdunk_catkin_ws/ && catkin_make -j2\""
+  echo "Or follow instructions in \"/opt/ros-slamdunk/share/slamdunk_node/README.md\""
 }
 
 REMOTE_COPY=
@@ -126,11 +134,9 @@ if [ -n "${REMOTE_COPY}" ]; then
     echo "Cannot reach ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE}"
     exit 1
   fi
-  ssh ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} "cd slamdunk_catkin_ws/src"
+  ssh ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} "[ ! -d slamdunk_catkin_ws/src ] && exit 1 || exit 0"
   if [ "$?" != "0" ]; then
-    echo "Cannot find slamdunk_catkin_ws/src in ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE}"
-    echo "  Hint: create catkin workspace \"slamdunk_catkin_ws\" on ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE}"
-    echo "ssh ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} \"source /opt/ros/indigo/setup.bash && mkdir -p slamdunk_catkin_ws/src && catkin_init_workspace\""
+    display_env_help
     exit 1
   fi
   rsync -avz src/${PACKAGE_NAME} ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE}:slamdunk_catkin_ws/src/
@@ -138,7 +144,10 @@ fi
 
 if [ -n "${REMOTE_GENERATE}" ]; then
   ssh ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} "[ ! -r slamdunk_catkin_ws/devel/setup.bash ] && exit 1 || exit 0"
-  [ "$?" != "0" ] && echo "Remote environment not ready" && echo "Please read /opt/ros-slamdunk/share/slamdunk_node/README.md" && exit 1
+  if [ "$?" != "0" ]; then
+    display_env_help
+    exit 1
+  fi
   ssh ${SLAMDUNK_USER}@${SLAMDUNK_DEVICE} "cd slamdunk_catkin_ws && source devel/setup.bash && catkin_make ${ARGS}"
 fi
 

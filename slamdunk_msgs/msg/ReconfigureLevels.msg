@@ -9,3 +9,5 @@ byte VIDEO_MODE = 4
 
 # General options, should reconfigure kalamos context
 byte VIDEO_SOURCE = 8
+
+byte SERVICE_TRIGGER = 16
